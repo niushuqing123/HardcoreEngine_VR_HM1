@@ -2,6 +2,7 @@ package homework1;
 
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.Random;
 import javax.swing.JFrame;
 import javax.swing.Timer;
 
@@ -10,6 +11,7 @@ public class Main {
     public static void main(String[] args) {
         // 1. 初始化数据引擎 (Model 层)
         EngineData data = new EngineData();
+        Random random = new Random(EngineData.RANDOM_SEED);
         
         // 2. 生成测试场景：一个 5x5 的地面阵列
         float cubeSize = 50f;
@@ -18,7 +20,7 @@ public class Main {
             for (int x = 0; x < 5; x++) {
                 float realX = x * (cubeSize + 2);
                 float realZ = z * (cubeSize + 2);
-                float realY = 0; 
+                float realY = 400f + random.nextFloat() * 400f;
                 
                 int color = ((x + z) % 2 == 0) ? 0x00ADB5 : 0x008A93; 
                 data.addCube(realX, realY, realZ, cubeSize, color);
