@@ -57,7 +57,8 @@ public class IsoCanvas extends JPanel {
                 { hs,  hs,  hs}, // 3
                 { hs, -hs,  hs}, // 4
                 {-hs, -hs,  hs}, // 5
-                { hs, -hs, -hs}  // 6
+                { hs, -hs, -hs}, // 6
+                {-hs, -hs, -hs}  // 7
         };
 
         float sinX = (float) Math.sin(rotX), cosX = (float) Math.cos(rotX);

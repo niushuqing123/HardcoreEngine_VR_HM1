@@ -8,7 +8,7 @@ public class EngineData {
     public int count = 0;
     private static final float INITIAL_ROTATION_RANGE = 0.06f;
     private static final float INITIAL_ANGULAR_VEL_RANGE = 0.6f;
-    private static final long RANDOM_SEED = 12345L;
+    public static final long RANDOM_SEED = 12345L;
     private final Random random = new Random(RANDOM_SEED);
     
     // index 代表方块的 ID

@@ -23,8 +23,7 @@ public class PhysicsCore {
     private static final float ANGULAR_DAMPING = 0.998f; // Slight angular damping per frame
     private static final float VELOCITY_THRESHOLD = 5.0f; // Stop jittering below this velocity
     private static final float ANGULAR_IMPULSE_FACTOR = 0.1f;
-    private static final long RANDOM_SEED = 67890L;
-    private final Random random = new Random(RANDOM_SEED);
+    private final Random random = new Random(EngineData.RANDOM_SEED);
 
     public PhysicsCore(EngineData data) {
         this.data = data;
