@@ -12,6 +12,11 @@ public class EngineData {
     public float[] size = new float[MAX_ENTITIES];
     public int[] colors = new int[MAX_ENTITIES];
     
+    // 物理引擎所需的速度数组 (扁平化)
+    public float[] vx = new float[MAX_ENTITIES];
+    public float[] vy = new float[MAX_ENTITIES];
+    public float[] vz = new float[MAX_ENTITIES];
+    
     // 提供一个快速添加方块的方法
     public void addCube(float x, float y, float z, float s, int hexColor) {
         if (count >= MAX_ENTITIES) return; // 防止越界
