@@ -24,7 +24,7 @@ public class PhysicsCore {
     private static final float VELOCITY_THRESHOLD = 5.0f; // Stop jittering below this velocity
     private static final float ANGULAR_IMPULSE_FACTOR = 0.1f;
     private static final long RANDOM_SEED = 67890L;
-    private static final Random RANDOM = new Random(RANDOM_SEED);
+    private final Random random = new Random(RANDOM_SEED);
 
     public PhysicsCore(EngineData data) {
         this.data = data;
@@ -88,9 +88,9 @@ public class PhysicsCore {
 
                 // Collision-induced torque: randomized angular impulse from impact speed
                 float impact = Math.abs(impactVy) * ANGULAR_IMPULSE_FACTOR;
-                data.avX[i] += (RANDOM.nextFloat() - 0.5f) * impact;
-                data.avY[i] += (RANDOM.nextFloat() - 0.5f) * impact;
-                data.avZ[i] += (RANDOM.nextFloat() - 0.5f) * impact;
+                data.avX[i] += (random.nextFloat() - 0.5f) * impact;
+                data.avY[i] += (random.nextFloat() - 0.5f) * impact;
+                data.avZ[i] += (random.nextFloat() - 0.5f) * impact;
 
                 // Anti-jitter: If velocity is very small, stop the entity
                 // This prevents endless tiny bounces due to floating-point precision

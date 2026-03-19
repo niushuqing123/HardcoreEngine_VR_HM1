@@ -9,7 +9,7 @@ public class EngineData {
     private static final float INITIAL_ROTATION_RANGE = 0.06f;
     private static final float INITIAL_ANGULAR_VEL_RANGE = 0.6f;
     private static final long RANDOM_SEED = 12345L;
-    private static final Random RANDOM = new Random(RANDOM_SEED);
+    private final Random random = new Random(RANDOM_SEED);
     
     // index 代表方块的 ID
     public float[] xPos = new float[MAX_ENTITIES];
@@ -43,12 +43,12 @@ public class EngineData {
         colors[count] = hexColor;
 
         // 初始微扰：避免所有方块完美对齐
-        rotX[count] = (RANDOM.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
-        rotY[count] = (RANDOM.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
-        rotZ[count] = (RANDOM.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
-        avX[count] = (RANDOM.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
-        avY[count] = (RANDOM.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
-        avZ[count] = (RANDOM.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+        rotX[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
+        rotY[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
+        rotZ[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
+        avX[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+        avY[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+        avZ[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
         count++;
     }
 }
