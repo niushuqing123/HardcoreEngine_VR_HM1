@@ -10,17 +10,78 @@ package homework1;
 public class PhysicsCore {
     private EngineData data;
 
+    // Frame counter for debug output
+    private long frameCount = 0;
+
+    // Physics constants
+    private static final float GRAVITY = -1500.0f;  // Acceleration on Y-axis
+    private static final float FLOOR_Y = 0.0f;      // Floor position
+    private static final float BOUNCE_DAMPING = 0.6f; // Energy loss on bounce
+    private static final float AIR_RESISTANCE = 0.998f; // Slight damping per frame
+    private static final float VELOCITY_THRESHOLD = 5.0f; // Stop jittering below this velocity
+
     public PhysicsCore(EngineData data) {
         this.data = data;
     }
 
-    // [占位符]：由云端 AI 实现主物理迭代
+    /**
+     * Main physics simulation step using Semi-Implicit Euler Integration.
+     *
+     * Semi-Implicit Euler (also called Symplectic Euler):
+     * 1. Update velocity first: v_new = v_old + a * dt
+     * 2. Update position using new velocity: p_new = p_old + v_new * dt
+     *
+     * This method is more stable than explicit Euler for physics simulation.
+     *
+     * @param dt Delta time in seconds (typically 0.016f for 60 FPS)
+     */
     public void stepSimulation(float dt) {
-        // TODO: AI Agent, implement semi-implicit Euler integration here
-        // 1. Apply gravity to all entities
-        // 2. Handle simple floor collision (y >= 0)
-        // 3. Update velocities
-        // 4. Update positions using flat arrays (data.xPos, data.yPos, data.zPos)
+        // Iterate through all active entities
+        for (int i = 0; i < data.count; i++) {
+            // ===== STEP 1: Apply Gravity =====
+            // Gravity only affects Y-axis velocity
+            float ay = GRAVITY;
+
+            // ===== STEP 2: Semi-Implicit Euler - Update Velocity First =====
+            // v_new = v_old + a * dt
+            data.vy[i] += ay * dt;
+
+            // ===== STEP 3: Apply Air Resistance (Optional but stabilizing) =====
+            // Slightly dampen all velocities to prevent accumulation of numerical errors
+            data.vx[i] *= AIR_RESISTANCE;
+            data.vy[i] *= AIR_RESISTANCE;
+            data.vz[i] *= AIR_RESISTANCE;
+
+            // ===== STEP 4: Semi-Implicit Euler - Update Position Using New Velocity =====
+            // p_new = p_old + v_new * dt
+            data.xPos[i] += data.vx[i] * dt;
+            data.yPos[i] += data.vy[i] * dt;
+            data.zPos[i] += data.vz[i] * dt;
+
+            // ===== STEP 5: Floor Collision Detection and Response =====
+            // Check if entity has penetrated the floor (Y < 0)
+            if (data.yPos[i] < FLOOR_Y) {
+                // Resolution: Snap position to floor exactly
+                data.yPos[i] = FLOOR_Y;
+
+                // Response: Bounce with damping
+                data.vy[i] = -data.vy[i] * BOUNCE_DAMPING;
+
+                // Anti-jitter: If velocity is very small, stop the entity
+                // This prevents endless tiny bounces due to floating-point precision
+                if (Math.abs(data.vy[i]) < VELOCITY_THRESHOLD) {
+                    data.vy[i] = 0.0f;
+                }
+            }
+        }
+
+        // ===== STEP 6: Debug Output Every 60 Frames =====
+        frameCount++;
+        if (frameCount % 60 == 0 && data.count > 0) {
+            // Output status of first entity (index 0) for verification
+            System.out.printf("[PhysDebug] Frame: %d | Entity[0] Y: %.2f | VY: %.2f\n",
+                              frameCount, data.yPos[0], data.vy[0]);
+        }
     }
 
     // [占位符]：由云端 AI 实现基于大锤敲击的冲量爆炸
