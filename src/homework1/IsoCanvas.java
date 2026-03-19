@@ -29,7 +29,8 @@ public class IsoCanvas extends JPanel {
         // 核心：遍历数据层的所有方块并渲染
         // 注意：2.5D 必须从后往前画 (画家算法)，这里我们假设添加顺序已经是正确的
         for (int i = 0; i < data.count; i++) {
-            drawIsoCube(g2d, data.xPos[i], data.yPos[i], data.zPos[i], data.size[i], data.colors[i], cx, cy);
+            drawIsoCube(g2d, data.xPos[i], data.yPos[i], data.zPos[i], data.size[i],
+                    data.rotX[i], data.rotY[i], data.rotZ[i], data.colors[i], cx, cy);
         }
     }
 
@@ -39,19 +40,65 @@ public class IsoCanvas extends JPanel {
         return new int[]{screenX, screenY};
     }
 
-    private void drawIsoCube(Graphics2D g, float x, float y, float z, float s, int hexColor, int cx, int cy) {
+    private void drawIsoCube(Graphics2D g, float x, float y, float z, float s,
+                             float rotX, float rotY, float rotZ, int hexColor, int cx, int cy) {
         int r = (hexColor >> 16) & 0xFF, gg = (hexColor >> 8) & 0xFF, b = hexColor & 0xFF;
         Color topColor = new Color(r, gg, b);
         Color leftColor = new Color((int)(r*0.65), (int)(gg*0.65), (int)(b*0.65));
         Color rightColor = new Color((int)(r*0.35), (int)(gg*0.35), (int)(b*0.35));
 
-        int[] p0 = project(x, y+s, z+s, cx, cy);
-        int[] p1 = project(x, y+s, z, cx, cy);
-        int[] p2 = project(x+s, y+s, z, cx, cy);
-        int[] p3 = project(x+s, y+s, z+s, cx, cy);
-        int[] p4 = project(x+s, y, z+s, cx, cy);
-        int[] p5 = project(x, y, z+s, cx, cy);
-        int[] p6 = project(x+s, y, z, cx, cy);
+        float hs = s * 0.5f;
+
+        // 顶点以立方体中心为原点
+        float[][] v = new float[][]{
+                {-hs,  hs,  hs}, // 0
+                {-hs,  hs, -hs}, // 1
+                { hs,  hs, -hs}, // 2
+                { hs,  hs,  hs}, // 3
+                { hs, -hs,  hs}, // 4
+                {-hs, -hs,  hs}, // 5
+                { hs, -hs, -hs}  // 6
+        };
+
+        float sinX = (float) Math.sin(rotX), cosX = (float) Math.cos(rotX);
+        float sinY = (float) Math.sin(rotY), cosY = (float) Math.cos(rotY);
+        float sinZ = (float) Math.sin(rotZ), cosZ = (float) Math.cos(rotZ);
+
+        int[][] p = new int[v.length][2];
+        float cx3d = x + hs;
+        float cy3d = y + hs;
+        float cz3d = z + hs;
+
+        for (int i = 0; i < v.length; i++) {
+            float vx = v[i][0];
+            float vy = v[i][1];
+            float vz = v[i][2];
+
+            // Rotate around X
+            float rx = vx;
+            float ry = vy * cosX - vz * sinX;
+            float rz = vy * sinX + vz * cosX;
+
+            // Rotate around Y
+            float r2x = rx * cosY + rz * sinY;
+            float r2y = ry;
+            float r2z = -rx * sinY + rz * cosY;
+
+            // Rotate around Z
+            float r3x = r2x * cosZ - r2y * sinZ;
+            float r3y = r2x * sinZ + r2y * cosZ;
+            float r3z = r2z;
+
+            p[i] = project(cx3d + r3x, cy3d + r3y, cz3d + r3z, cx, cy);
+        }
+
+        int[] p0 = p[0];
+        int[] p1 = p[1];
+        int[] p2 = p[2];
+        int[] p3 = p[3];
+        int[] p4 = p[4];
+        int[] p5 = p[5];
+        int[] p6 = p[6];
 
         g.setColor(topColor);
         g.fillPolygon(new int[]{p0[0], p1[0], p2[0], p3[0]}, new int[]{p0[1], p1[1], p2[1], p3[1]}, 4);

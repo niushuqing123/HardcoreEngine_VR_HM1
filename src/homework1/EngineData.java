@@ -4,6 +4,8 @@ public class EngineData {
     // 强行用扁平数组存储所有 3D 数据，极其硬核
     public final int MAX_ENTITIES = 1000;
     public int count = 0;
+    private static final float INITIAL_ROTATION_RANGE = 0.06f;
+    private static final float INITIAL_ANGULAR_VEL_RANGE = 0.6f;
     
     // index 代表方块的 ID
     public float[] xPos = new float[MAX_ENTITIES];
@@ -16,6 +18,16 @@ public class EngineData {
     public float[] vx = new float[MAX_ENTITIES];
     public float[] vy = new float[MAX_ENTITIES];
     public float[] vz = new float[MAX_ENTITIES];
+
+    // 角度数组（弧度）
+    public float[] rotX = new float[MAX_ENTITIES];
+    public float[] rotY = new float[MAX_ENTITIES];
+    public float[] rotZ = new float[MAX_ENTITIES];
+
+    // 角速度数组（弧度/秒）
+    public float[] avX = new float[MAX_ENTITIES];
+    public float[] avY = new float[MAX_ENTITIES];
+    public float[] avZ = new float[MAX_ENTITIES];
     
     // 提供一个快速添加方块的方法
     public void addCube(float x, float y, float z, float s, int hexColor) {
@@ -25,6 +37,14 @@ public class EngineData {
         zPos[count] = z;
         size[count] = s;
         colors[count] = hexColor;
+
+        // 初始微扰：避免所有方块完美对齐
+        rotX[count] = (float) ((Math.random() - 0.5d) * INITIAL_ROTATION_RANGE);
+        rotY[count] = (float) ((Math.random() - 0.5d) * INITIAL_ROTATION_RANGE);
+        rotZ[count] = (float) ((Math.random() - 0.5d) * INITIAL_ROTATION_RANGE);
+        avX[count] = (float) ((Math.random() - 0.5d) * INITIAL_ANGULAR_VEL_RANGE);
+        avY[count] = (float) ((Math.random() - 0.5d) * INITIAL_ANGULAR_VEL_RANGE);
+        avZ[count] = (float) ((Math.random() - 0.5d) * INITIAL_ANGULAR_VEL_RANGE);
         count++;
     }
 }
