@@ -33,16 +33,7 @@ public class IsoCanvas extends JPanel {
             order[i] = i;
             depth[i] = data.xPos[i] + data.zPos[i] - data.yPos[i];
         }
-        for (int i = 1; i < data.count; i++) {
-            int idx = order[i];
-            float d = depth[idx];
-            int j = i - 1;
-            while (j >= 0 && depth[order[j]] > d) {
-                order[j + 1] = order[j];
-                j--;
-            }
-            order[j + 1] = idx;
-        }
+        insertionSortByDepth(order, depth, data.count);
 
         for (int n = 0; n < data.count; n++) {
             int i = order[n];
@@ -141,16 +132,7 @@ public class IsoCanvas extends JPanel {
             float avgZ = (worldZ[face[0]] + worldZ[face[1]] + worldZ[face[2]] + worldZ[face[3]]) * 0.25f;
             faceDepth[f] = avgX + avgZ - avgY;
         }
-        for (int i = 1; i < faces.length; i++) {
-            int idx = faceOrder[i];
-            float d = faceDepth[idx];
-            int j = i - 1;
-            while (j >= 0 && faceDepth[faceOrder[j]] > d) {
-                faceOrder[j + 1] = faceOrder[j];
-                j--;
-            }
-            faceOrder[j + 1] = idx;
-        }
+        insertionSortByDepth(faceOrder, faceDepth, faces.length);
 
         for (int oi = 0; oi < faceOrder.length; oi++) {
             int f = faceOrder[oi];
@@ -191,5 +173,18 @@ public class IsoCanvas extends JPanel {
         float r3y = r2x * sinZ + r2y * cosZ;
         float r3z = r2z;
         return new float[]{r3x, r3y, r3z};
+    }
+
+    private void insertionSortByDepth(int[] order, float[] depth, int length) {
+        for (int i = 1; i < length; i++) {
+            int idx = order[i];
+            float d = depth[idx];
+            int j = i - 1;
+            while (j >= 0 && depth[order[j]] > d) {
+                order[j + 1] = order[j];
+                j--;
+            }
+            order[j + 1] = idx;
+        }
     }
 }

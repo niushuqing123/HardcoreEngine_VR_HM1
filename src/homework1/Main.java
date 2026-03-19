@@ -7,6 +7,8 @@ import javax.swing.JFrame;
 import javax.swing.Timer;
 
 public class Main {
+    private static final float SPAWN_HEIGHT_MIN = 400f;
+    private static final float SPAWN_HEIGHT_RANGE = 400f;
     
     public static void main(String[] args) {
         // 1. 初始化数据引擎 (Model 层)
@@ -20,7 +22,7 @@ public class Main {
             for (int x = 0; x < 5; x++) {
                 float realX = x * (cubeSize + 2);
                 float realZ = z * (cubeSize + 2);
-                float realY = 400f + random.nextFloat() * 400f;
+                float realY = SPAWN_HEIGHT_MIN + random.nextFloat() * SPAWN_HEIGHT_RANGE;
                 
                 int color = ((x + z) % 2 == 0) ? 0x00ADB5 : 0x008A93; 
                 data.addCube(realX, realY, realZ, cubeSize, color);

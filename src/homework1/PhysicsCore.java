@@ -122,7 +122,7 @@ public class PhysicsCore {
                     continue;
                 }
 
-                float dist = (float) Math.sqrt(Math.max(distSq, MIN_SEPARATION_EPSILON));
+                float dist = (float) Math.sqrt(distSq);
                 float nx;
                 float ny;
                 float nz;
@@ -159,7 +159,7 @@ public class PhysicsCore {
                 // Positional correction to prevent persistent overlap/clumping
                 float overlap = minDist - dist;
                 if (overlap > 0.0f) {
-                    float correction = overlap * 0.5f + MIN_SEPARATION_EPSILON;
+                    float correction = Math.max(overlap * 0.5f, MIN_SEPARATION_EPSILON);
                     data.xPos[i] -= nx * correction;
                     data.yPos[i] -= ny * correction;
                     data.zPos[i] -= nz * correction;
