@@ -23,6 +23,7 @@ public class PhysicsCore {
     private static final float ANGULAR_DAMPING = 0.998f; // Slight angular damping per frame
     private static final float VELOCITY_THRESHOLD = 5.0f; // Stop jittering below this velocity
     private static final float ANGULAR_IMPULSE_FACTOR = 0.1f;
+    private static final float MIN_SEPARATION_EPSILON = 0.001f;
     private final Random random = new Random(EngineData.RANDOM_SEED);
 
     public PhysicsCore(EngineData data) {
@@ -99,7 +100,77 @@ public class PhysicsCore {
             }
         }
 
-        // ===== STEP 6: Debug Output Every 60 Frames =====
+        // ===== STEP 6: Inter-cube collision (sphere-sphere approximation) =====
+        // Radius simplification: r = size * 0.5
+        for (int i = 0; i < data.count - 1; i++) {
+            float xi = data.xPos[i];
+            float yi = data.yPos[i];
+            float zi = data.zPos[i];
+            float ri = data.size[i] * 0.5f;
+
+            for (int j = i + 1; j < data.count; j++) {
+                float dx = data.xPos[j] - xi;
+                float dy = data.yPos[j] - yi;
+                float dz = data.zPos[j] - zi;
+
+                float distSq = dx * dx + dy * dy + dz * dz;
+                float rj = data.size[j] * 0.5f;
+                float minDist = ri + rj;
+                float minDistSq = minDist * minDist;
+
+                if (distSq >= minDistSq) {
+                    continue;
+                }
+
+                float dist = (float) Math.sqrt(distSq);
+                float nx;
+                float ny;
+                float nz;
+
+                if (dist < MIN_SEPARATION_EPSILON) {
+                    // Perfect overlap fallback normal
+                    nx = 1.0f;
+                    ny = 0.0f;
+                    nz = 0.0f;
+                } else {
+                    nx = dx / dist;
+                    ny = dy / dist;
+                    nz = dz / dist;
+                }
+
+                // Relative velocity along collision normal
+                float rvx = data.vx[j] - data.vx[i];
+                float rvy = data.vy[j] - data.vy[i];
+                float rvz = data.vz[j] - data.vz[i];
+                float velAlongNormal = rvx * nx + rvy * ny + rvz * nz;
+
+                // Only resolve if moving toward each other
+                if (velAlongNormal < 0.0f) {
+                    // Equal-mass elastic collision (restitution = 1)
+                    float impulse = -velAlongNormal;
+                    data.vx[i] -= impulse * nx;
+                    data.vy[i] -= impulse * ny;
+                    data.vz[i] -= impulse * nz;
+                    data.vx[j] += impulse * nx;
+                    data.vy[j] += impulse * ny;
+                    data.vz[j] += impulse * nz;
+                }
+
+                // Positional correction to prevent persistent overlap/clumping
+                float overlap = minDist - dist;
+                if (overlap > 0.0f) {
+                    float correction = Math.max(overlap * 0.5f, MIN_SEPARATION_EPSILON);
+                    data.xPos[i] -= nx * correction;
+                    data.yPos[i] -= ny * correction;
+                    data.zPos[i] -= nz * correction;
+                    data.xPos[j] += nx * correction;
+                    data.yPos[j] += ny * correction;
+                    data.zPos[j] += nz * correction;
+                }
+            }
+        }
+ 
+        // ===== STEP 7: Debug Output Every 60 Frames =====
         frameCount++;
         if (frameCount % 60 == 0 && data.count > 0) {
             // Output status of first entity (index 0) for verification

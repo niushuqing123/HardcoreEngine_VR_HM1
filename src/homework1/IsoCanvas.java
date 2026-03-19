@@ -26,9 +26,17 @@ public class IsoCanvas extends JPanel {
         int cx = getWidth() / 2;
         int cy = getHeight() / 2 + 150; // 整体下移一点
 
-        // 核心：遍历数据层的所有方块并渲染
-        // 注意：2.5D 必须从后往前画 (画家算法)，这里我们假设添加顺序已经是正确的
+        // 核心：根据 x + z - y 做深度排序（画家算法），值小的更远，先画
+        int[] order = new int[data.count];
+        float[] depth = new float[data.count];
         for (int i = 0; i < data.count; i++) {
+            order[i] = i;
+            depth[i] = data.xPos[i] + data.zPos[i] - data.yPos[i];
+        }
+        insertionSortByDepth(order, depth, data.count);
+
+        for (int n = 0; n < data.count; n++) {
+            int i = order[n];
             drawIsoCube(g2d, data.xPos[i], data.yPos[i], data.zPos[i], data.size[i],
                     data.rotX[i], data.rotY[i], data.rotZ[i], data.colors[i], cx, cy);
         }
@@ -44,75 +52,139 @@ public class IsoCanvas extends JPanel {
                              float rotX, float rotY, float rotZ, int hexColor, int cx, int cy) {
         int r = (hexColor >> 16) & 0xFF, gg = (hexColor >> 8) & 0xFF, b = hexColor & 0xFF;
         Color topColor = new Color(r, gg, b);
-        Color leftColor = new Color((int)(r*0.65), (int)(gg*0.65), (int)(b*0.65));
-        Color rightColor = new Color((int)(r*0.35), (int)(gg*0.35), (int)(b*0.35));
+        Color midColor = new Color((int) (r * 0.75f), (int) (gg * 0.75f), (int) (b * 0.75f));
+        Color darkColor = new Color((int) (r * 0.55f), (int) (gg * 0.55f), (int) (b * 0.55f));
+        Color darkerColor = new Color((int) (r * 0.4f), (int) (gg * 0.4f), (int) (b * 0.4f));
+        Color[] faceColors = new Color[]{
+                darkColor,      // +X
+                midColor,       // -X
+                topColor,       // +Y
+                darkerColor,    // -Y
+                darkColor,      // +Z
+                midColor        // -Z
+        };
 
         float hs = s * 0.5f;
 
-        // 顶点以立方体中心为原点
-        float[][] v = new float[][]{
-                {-hs,  hs,  hs}, // 0
-                {-hs,  hs, -hs}, // 1
+        // 顶点以立方体中心为原点（局部空间）
+        float[][] local = new float[][]{
+                {-hs, -hs, -hs}, // 0
+                { hs, -hs, -hs}, // 1
                 { hs,  hs, -hs}, // 2
-                { hs,  hs,  hs}, // 3
-                { hs, -hs,  hs}, // 4
-                {-hs, -hs,  hs}, // 5
-                { hs, -hs, -hs}, // 6
-                {-hs, -hs, -hs}  // 7
+                {-hs,  hs, -hs}, // 3
+                {-hs, -hs,  hs}, // 4
+                { hs, -hs,  hs}, // 5
+                { hs,  hs,  hs}, // 6
+                {-hs,  hs,  hs}  // 7
         };
+        int[][] faces = new int[][]{
+                {1, 2, 6, 5}, // +X
+                {0, 4, 7, 3}, // -X
+                {3, 7, 6, 2}, // +Y
+                {0, 1, 5, 4}, // -Y
+                {4, 5, 6, 7}, // +Z
+                {0, 3, 2, 1}  // -Z
+        };
+        float[][] localNormals = new float[][]{
+                {1, 0, 0},
+                {-1, 0, 0},
+                {0, 1, 0},
+                {0, -1, 0},
+                {0, 0, 1},
+                {0, 0, -1}
+        };
+
+        float viewX = 0.0f;
+        float viewY = 1.0f;
+        float viewZ = -1.0f;
 
         float sinX = (float) Math.sin(rotX), cosX = (float) Math.cos(rotX);
         float sinY = (float) Math.sin(rotY), cosY = (float) Math.cos(rotY);
         float sinZ = (float) Math.sin(rotZ), cosZ = (float) Math.cos(rotZ);
 
-        int[][] p = new int[v.length][2];
+        int[][] p = new int[local.length][2];
+        float[] worldX = new float[local.length];
+        float[] worldY = new float[local.length];
+        float[] worldZ = new float[local.length];
         float cx3d = x + hs;
         float cy3d = y + hs;
         float cz3d = z + hs;
 
-        for (int i = 0; i < v.length; i++) {
-            float vx = v[i][0];
-            float vy = v[i][1];
-            float vz = v[i][2];
+        for (int i = 0; i < local.length; i++) {
+            float vx = local[i][0];
+            float vy = local[i][1];
+            float vz = local[i][2];
 
-            // Rotate around X
-            float rx = vx;
-            float ry = vy * cosX - vz * sinX;
-            float rz = vy * sinX + vz * cosX;
-
-            // Rotate around Y
-            float r2x = rx * cosY + rz * sinY;
-            float r2y = ry;
-            float r2z = -rx * sinY + rz * cosY;
-
-            // Rotate around Z
-            float r3x = r2x * cosZ - r2y * sinZ;
-            float r3y = r2x * sinZ + r2y * cosZ;
-            float r3z = r2z;
-
-            p[i] = project(cx3d + r3x, cy3d + r3y, cz3d + r3z, cx, cy);
+            float[] rotated = rotateXYZ(vx, vy, vz, sinX, cosX, sinY, cosY, sinZ, cosZ);
+            worldX[i] = cx3d + rotated[0];
+            worldY[i] = cy3d + rotated[1];
+            worldZ[i] = cz3d + rotated[2];
+            p[i] = project(worldX[i], worldY[i], worldZ[i], cx, cy);
         }
 
-        int[] p0 = p[0];
-        int[] p1 = p[1];
-        int[] p2 = p[2];
-        int[] p3 = p[3];
-        int[] p4 = p[4];
-        int[] p5 = p[5];
-        int[] p6 = p[6];
-        int[] p7 = p[7];
+        int[] faceOrder = new int[faces.length];
+        float[] faceDepth = new float[faces.length];
+        for (int f = 0; f < faces.length; f++) {
+            faceOrder[f] = f;
+            int[] face = faces[f];
+            float avgX = (worldX[face[0]] + worldX[face[1]] + worldX[face[2]] + worldX[face[3]]) * 0.25f;
+            float avgY = (worldY[face[0]] + worldY[face[1]] + worldY[face[2]] + worldY[face[3]]) * 0.25f;
+            float avgZ = (worldZ[face[0]] + worldZ[face[1]] + worldZ[face[2]] + worldZ[face[3]]) * 0.25f;
+            faceDepth[f] = avgX + avgZ - avgY;
+        }
+        insertionSortByDepth(faceOrder, faceDepth, faces.length);
 
-        g.setColor(topColor);
-        g.fillPolygon(new int[]{p0[0], p1[0], p2[0], p3[0]}, new int[]{p0[1], p1[1], p2[1], p3[1]}, 4);
-        g.setColor(leftColor);
-        g.fillPolygon(new int[]{p0[0], p3[0], p4[0], p5[0]}, new int[]{p0[1], p3[1], p4[1], p5[1]}, 4);
-        g.setColor(rightColor);
-        g.fillPolygon(new int[]{p3[0], p2[0], p6[0], p4[0]}, new int[]{p3[1], p2[1], p6[1], p4[1]}, 4);
+        for (int oi = 0; oi < faceOrder.length; oi++) {
+            int f = faceOrder[oi];
+            float[] rotatedNormal = rotateXYZ(
+                    localNormals[f][0], localNormals[f][1], localNormals[f][2],
+                    sinX, cosX, sinY, cosY, sinZ, cosZ
+            );
+            float dot = rotatedNormal[0] * viewX + rotatedNormal[1] * viewY + rotatedNormal[2] * viewZ;
+            if (dot <= 0.0f) {
+                continue;
+            }
 
-        g.setColor(new Color(0x111111));
-        g.drawPolygon(new int[]{p0[0], p1[0], p2[0], p3[0]}, new int[]{p0[1], p1[1], p2[1], p3[1]}, 4);
-        g.drawPolygon(new int[]{p0[0], p3[0], p4[0], p5[0]}, new int[]{p0[1], p3[1], p4[1], p5[1]}, 4);
-        g.drawPolygon(new int[]{p3[0], p2[0], p6[0], p4[0]}, new int[]{p3[1], p2[1], p6[1], p4[1]}, 4);
-        g.drawPolygon(new int[]{p5[0], p7[0], p6[0], p4[0]}, new int[]{p5[1], p7[1], p6[1], p4[1]}, 4);
+            int[] face = faces[f];
+            int[] xs = new int[]{p[face[0]][0], p[face[1]][0], p[face[2]][0], p[face[3]][0]};
+            int[] ys = new int[]{p[face[0]][1], p[face[1]][1], p[face[2]][1], p[face[3]][1]};
+
+            g.setColor(faceColors[f]);
+            g.fillPolygon(xs, ys, 4);
+            g.setColor(new Color(0x111111));
+            g.drawPolygon(xs, ys, 4);
+        }
+    }
+
+    private float[] rotateXYZ(float vx, float vy, float vz,
+                              float sinX, float cosX, float sinY, float cosY, float sinZ, float cosZ) {
+        // Rotate around X
+        float rx = vx;
+        float ry = vy * cosX - vz * sinX;
+        float rz = vy * sinX + vz * cosX;
+
+        // Rotate around Y
+        float r2x = rx * cosY + rz * sinY;
+        float r2y = ry;
+        float r2z = -rx * sinY + rz * cosY;
+
+        // Rotate around Z
+        float r3x = r2x * cosZ - r2y * sinZ;
+        float r3y = r2x * sinZ + r2y * cosZ;
+        float r3z = r2z;
+        return new float[]{r3x, r3y, r3z};
+    }
+
+    private void insertionSortByDepth(int[] order, float[] depth, int length) {
+        for (int i = 1; i < length; i++) {
+            int idx = order[i];
+            float d = depth[idx];
+            int j = i - 1;
+            while (j >= 0 && depth[order[j]] > d) {
+                order[j + 1] = order[j];
+                j--;
+            }
+            order[j + 1] = idx;
+        }
     }
 }
