@@ -113,6 +113,6 @@ public class IsoCanvas extends JPanel {
         g.drawPolygon(new int[]{p0[0], p1[0], p2[0], p3[0]}, new int[]{p0[1], p1[1], p2[1], p3[1]}, 4);
         g.drawPolygon(new int[]{p0[0], p3[0], p4[0], p5[0]}, new int[]{p0[1], p3[1], p4[1], p5[1]}, 4);
         g.drawPolygon(new int[]{p3[0], p2[0], p6[0], p4[0]}, new int[]{p3[1], p2[1], p6[1], p4[1]}, 4);
-        g.drawPolygon(new int[]{p5[0], p4[0], p6[0], p7[0]}, new int[]{p5[1], p4[1], p6[1], p7[1]}, 4);
+        g.drawPolygon(new int[]{p5[0], p7[0], p6[0], p4[0]}, new int[]{p5[1], p7[1], p6[1], p4[1]}, 4);
     }
 }
