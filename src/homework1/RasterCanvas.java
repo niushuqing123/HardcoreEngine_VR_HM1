@@ -18,20 +18,25 @@ public class RasterCanvas extends JPanel {
     private static final float CAMERA_NEAR = 0.1f;
     private static final float CAMERA_FAR = 5000.0f;
     private static final float W_EPSILON = 1.0e-6f;
-    private static final float[] BASE_CUBE_VERTICES = {
-            -0.5f, -0.5f, -0.5f,
-            0.5f, -0.5f, -0.5f,
-            0.5f, 0.5f, -0.5f,
-            -0.5f, 0.5f, -0.5f,
-            -0.5f, -0.5f, 0.5f,
-            0.5f, -0.5f, 0.5f,
-            0.5f, 0.5f, 0.5f,
-            -0.5f, 0.5f, 0.5f
+    private static final int MAX_FACE_SHADE_INDEX = 5;
+    private static final float FACE_SHADE_STEP = 0.10f;
+    private static final float[][] CUBE_VERTICES = {
+            {-0.5f, -0.5f, -0.5f},
+            {0.5f, -0.5f, -0.5f},
+            {0.5f, 0.5f, -0.5f},
+            {-0.5f, 0.5f, -0.5f},
+            {-0.5f, -0.5f, 0.5f},
+            {0.5f, -0.5f, 0.5f},
+            {0.5f, 0.5f, 0.5f},
+            {-0.5f, 0.5f, 0.5f}
     };
-    private static final int[][] CUBE_EDGES = {
-            {0, 1}, {1, 2}, {2, 3}, {3, 0},
-            {4, 5}, {5, 6}, {6, 7}, {7, 4},
-            {0, 4}, {1, 5}, {2, 6}, {3, 7}
+    private static final int[][] CUBE_TRIANGLES = {
+            {0, 1, 2}, {2, 3, 0},
+            {4, 6, 5}, {6, 4, 7},
+            {0, 3, 7}, {7, 4, 0},
+            {1, 5, 6}, {6, 2, 1},
+            {3, 2, 6}, {6, 7, 3},
+            {0, 4, 5}, {5, 1, 0}
     };
 
     private final BufferedImage image;
@@ -83,7 +88,65 @@ public class RasterCanvas extends JPanel {
         }
     }
 
-    public void drawWireframeCube(EngineData data, int index, Matrix4f viewProjMatrix) {
+    private static float edgeFunction(float ax, float ay, float bx, float by, float px, float py) {
+        return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
+    }
+
+    private static int shadeFaceColor(int baseColor, int faceIndex) {
+        float shade = 1.0f - Math.min(faceIndex, MAX_FACE_SHADE_INDEX) * FACE_SHADE_STEP;
+        int r = (baseColor >> 16) & 0xFF;
+        int g = (baseColor >> 8) & 0xFF;
+        int b = baseColor & 0xFF;
+        int rr = Math.max(0, Math.min(255, Math.round(r * shade)));
+        int gg = Math.max(0, Math.min(255, Math.round(g * shade)));
+        int bb = Math.max(0, Math.min(255, Math.round(b * shade)));
+        return (rr << 16) | (gg << 8) | bb;
+    }
+
+    private void drawTriangle(float[] v0, float[] v1, float[] v2, int color) {
+        int minX = Math.max(0, (int) Math.floor(Math.min(v0[0], Math.min(v1[0], v2[0]))));
+        int maxX = Math.min(RENDER_W - 1, (int) Math.ceil(Math.max(v0[0], Math.max(v1[0], v2[0]))));
+        int minY = Math.max(0, (int) Math.floor(Math.min(v0[1], Math.min(v1[1], v2[1]))));
+        int maxY = Math.min(RENDER_H - 1, (int) Math.ceil(Math.max(v0[1], Math.max(v1[1], v2[1]))));
+        if (minX > maxX || minY > maxY) {
+            return;
+        }
+
+        float area = edgeFunction(v0[0], v0[1], v1[0], v1[1], v2[0], v2[1]);
+        if (Math.abs(area) <= W_EPSILON) {
+            return;
+        }
+
+        boolean areaPositive = area > 0.0f;
+        for (int y = minY; y <= maxY; y++) {
+            float py = y + 0.5f;
+            for (int x = minX; x <= maxX; x++) {
+                float px = x + 0.5f;
+                float w0 = edgeFunction(v1[0], v1[1], v2[0], v2[1], px, py);
+                float w1 = edgeFunction(v2[0], v2[1], v0[0], v0[1], px, py);
+                float w2 = edgeFunction(v0[0], v0[1], v1[0], v1[1], px, py);
+                boolean inside = areaPositive
+                        ? (w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f)
+                        : (w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f);
+                if (!inside) {
+                    continue;
+                }
+
+                float invArea = 1.0f / area;
+                float b0 = w0 * invArea;
+                float b1 = w1 * invArea;
+                float b2 = w2 * invArea;
+                float interpolatedZ = b0 * v0[2] + b1 * v1[2] + b2 * v2[2];
+                int pixelIndex = y * RENDER_W + x;
+                if (interpolatedZ < zBuffer[pixelIndex]) {
+                    zBuffer[pixelIndex] = interpolatedZ;
+                    pixels[pixelIndex] = color;
+                }
+            }
+        }
+    }
+
+    public void drawSolidCube(EngineData data, int index, Matrix4f viewProjMatrix) {
         float cubeSize = data.size[index];
         Matrix4f model = Matrix4f.multiply(
                 Matrix4f.createTranslation(data.xPos[index], data.yPos[index], data.zPos[index]),
@@ -94,18 +157,14 @@ public class RasterCanvas extends JPanel {
                                 Matrix4f.createRotationX(data.rotX[index]))));
         Matrix4f mvp = Matrix4f.multiply(viewProjMatrix, model);
 
-        int[] screenX = new int[8];
-        int[] screenY = new int[8];
-        boolean[] valid = new boolean[8];
+        float[][] transformed = new float[CUBE_VERTICES.length][];
         for (int v = 0; v < 8; v++) {
-            int base = v * 3;
-            float lx = BASE_CUBE_VERTICES[base] * cubeSize;
-            float ly = BASE_CUBE_VERTICES[base + 1] * cubeSize;
-            float lz = BASE_CUBE_VERTICES[base + 2] * cubeSize;
+            float lx = CUBE_VERTICES[v][0] * cubeSize;
+            float ly = CUBE_VERTICES[v][1] * cubeSize;
+            float lz = CUBE_VERTICES[v][2] * cubeSize;
             float[] clip = mvp.transform(lx, ly, lz, 1.0f);
             float w = clip[3];
             if (Math.abs(w) <= W_EPSILON) {
-                valid[v] = false;
                 continue;
             }
             float invW = 1.0f / w;
@@ -113,29 +172,30 @@ public class RasterCanvas extends JPanel {
             float ndcY = clip[1] * invW;
             float ndcZ = clip[2] * invW;
             if (ndcZ < -1.0f || ndcZ > 1.0f) {
-                valid[v] = false;
                 continue;
             }
-            screenX[v] = (int) ((ndcX * 0.5f + 0.5f) * (RENDER_W - 1));
-            screenY[v] = (int) ((1.0f - (ndcY * 0.5f + 0.5f)) * (RENDER_H - 1));
-            valid[v] = true;
+            float screenX = (ndcX * 0.5f + 0.5f) * (RENDER_W - 1);
+            float screenY = (1.0f - (ndcY * 0.5f + 0.5f)) * (RENDER_H - 1);
+            transformed[v] = new float[]{screenX, screenY, ndcZ};
         }
 
-        int color = data.colors[index];
-        for (int[] edge : CUBE_EDGES) {
-            int v0 = edge[0];
-            int v1 = edge[1];
-            if (valid[v0] && valid[v1]) {
-                drawLine(screenX[v0], screenY[v0], screenX[v1], screenY[v1], color);
+        int baseColor = data.colors[index];
+        for (int tri = 0; tri < CUBE_TRIANGLES.length; tri++) {
+            int i0 = CUBE_TRIANGLES[tri][0];
+            int i1 = CUBE_TRIANGLES[tri][1];
+            int i2 = CUBE_TRIANGLES[tri][2];
+            float[] v0 = transformed[i0];
+            float[] v1 = transformed[i1];
+            float[] v2 = transformed[i2];
+            if (v0 != null && v1 != null && v2 != null) {
+                int faceColor = shadeFaceColor(baseColor, tri / 2);
+                drawTriangle(v0, v1, v2, faceColor);
             }
         }
     }
 
-    public void renderWireframes(EngineData data) {
-        Matrix4f viewProjMatrix = Matrix4f.multiply(projectionMatrix, viewMatrix);
-        for (int i = 0; i < data.count; i++) {
-            drawWireframeCube(data, i, viewProjMatrix);
-        }
+    public Matrix4f getViewProjMatrix() {
+        return Matrix4f.multiply(projectionMatrix, viewMatrix);
     }
 
     @Override
