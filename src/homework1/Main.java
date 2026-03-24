@@ -19,7 +19,9 @@ public class Main {
     private static final float ISO_A = 0.866025f;
     private static final float ISO_B = 0.5f;
     private static final int VIEW_Y_OFFSET = 150;
-    private static final int PHYSICS_STEP_RATE = 60;
+    private static final float TARGET_PHYSICS_FPS = 1.0f / FIXED_DT;
+    private static final float FPS_SMOOTHING_FACTOR = 0.9f;
+    private static final float MIN_FRAME_TIME = 1.0e-6f;
     
     public static void main(String[] args) {
         // 1. 初始化数据引擎 (Model 层)
@@ -45,8 +47,8 @@ public class Main {
         final class LoopState {
             long lastTickNanos;
             float accumulator = 0.0f;
-            float frameFpsSmoothed = 0.0f;
-            float physicsFpsSmoothed = PHYSICS_STEP_RATE;
+            float renderFpsSmoothed = 0.0f;
+            float physicsFpsSmoothed = 0.0f;
             PhysicsCore physicsCore;
             EngineData engineData;
         }
@@ -65,9 +67,10 @@ public class Main {
             loopState.accumulator += frameDt;
             if (frameDt > 0.0f) {
                 float frameFpsInstant = 1.0f / frameDt;
-                loopState.frameFpsSmoothed = (loopState.frameFpsSmoothed <= 0.0f)
+                loopState.renderFpsSmoothed = (loopState.renderFpsSmoothed <= 0.0f)
                         ? frameFpsInstant
-                        : loopState.frameFpsSmoothed * 0.9f + frameFpsInstant * 0.1f;
+                        : loopState.renderFpsSmoothed * FPS_SMOOTHING_FACTOR
+                        + frameFpsInstant * (1.0f - FPS_SMOOTHING_FACTOR);
             }
 
             int substeps = 0;
@@ -79,9 +82,13 @@ public class Main {
             if (substeps == MAX_SUBSTEPS_PER_FRAME) {
                 loopState.accumulator = 0.0f;
             }
-            float physicsFpsInstant = substeps / Math.max(frameDt, 1.0e-6f);
-            loopState.physicsFpsSmoothed = loopState.physicsFpsSmoothed * 0.9f + physicsFpsInstant * 0.1f;
-            canvas.setDebugStats(loopState.engineData.count, loopState.frameFpsSmoothed, loopState.physicsFpsSmoothed);
+            float simulatedSeconds = substeps * FIXED_DT;
+            float physicsFpsInstant = (simulatedSeconds / Math.max(frameDt, MIN_FRAME_TIME)) * TARGET_PHYSICS_FPS;
+            loopState.physicsFpsSmoothed = (loopState.physicsFpsSmoothed <= 0.0f)
+                    ? physicsFpsInstant
+                    : loopState.physicsFpsSmoothed * FPS_SMOOTHING_FACTOR
+                    + physicsFpsInstant * (1.0f - FPS_SMOOTHING_FACTOR);
+            canvas.setDebugStats(loopState.engineData.count, loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
             canvas.repaint(); // 触发 IsoCanvas 重新画图
         });
         loopState.lastTickNanos = System.nanoTime();
@@ -98,7 +105,7 @@ public class Main {
                     loopState.physicsCore = new PhysicsCore(resetData);
                     canvas.setData(resetData);
                     canvas.setDebugStats(loopState.engineData.count,
-                            loopState.frameFpsSmoothed, loopState.physicsFpsSmoothed);
+                            loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
                     canvas.repaint();
                 }
             }

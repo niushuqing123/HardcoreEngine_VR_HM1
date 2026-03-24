@@ -15,6 +15,8 @@ public class IsoCanvas extends JPanel {
     private static final Color BOUNDS_COLOR = new Color(120, 230, 255, 150);
     private static final Color HUD_BG = new Color(0, 0, 0, 130);
     private static final Color HUD_TEXT = new Color(0xEAF4FF);
+    private static final float SCENE_BOUNDS_INITIAL_MAX_HEIGHT = 180.0f;
+    private static final int HUD_CORNER_RADIUS = 12;
     
     // 渲染器需要持有数据的引用
     private EngineData data;
@@ -124,7 +126,7 @@ public class IsoCanvas extends JPanel {
         float minX = Float.MAX_VALUE;
         float minZ = Float.MAX_VALUE;
         float maxX = -Float.MAX_VALUE;
-        float maxY = 180.0f;
+        float maxY = SCENE_BOUNDS_INITIAL_MAX_HEIGHT;
         float maxZ = -Float.MAX_VALUE;
         for (int i = 0; i < data.count; i++) {
             float x0 = data.xPos[i];
@@ -176,7 +178,7 @@ public class IsoCanvas extends JPanel {
         int panelW = 270;
         int panelH = 76;
         g.setColor(HUD_BG);
-        g.fillRoundRect(panelX, panelY, panelW, panelH, 12, 12);
+        g.fillRoundRect(panelX, panelY, panelW, panelH, HUD_CORNER_RADIUS, HUD_CORNER_RADIUS);
         g.setColor(HUD_TEXT);
         g.setFont(g.getFont().deriveFont(Font.BOLD, 14f));
         g.drawString("Blocks: " + blockCount, panelX + 12, panelY + 24);
