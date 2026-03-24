@@ -25,7 +25,7 @@ public class Main {
     private static final int WALL_COLOR_A = 0xD7DDE6;
     private static final int WALL_COLOR_B = 0xBEC8D4;
     private static final float BUTTON_HIT_RADIUS_SCALE = 0.70f;
-    private static final float WALL_DIAGONAL_DEPTH = 320.0f;
+    private static final float WALL_DIAGONAL_DEPTH = 320.0f; // x+z plane constant used as wall center Z.
     private static final float WALL_BASE_Y = 170.0f;
 
     private static final class SceneSetup {
@@ -211,6 +211,7 @@ public class Main {
             for (int column = 0; column < wallColumns; column++) {
                 float realX = wallOriginX + column * spacing;
                 float realY = WALL_BASE_Y + row * spacing;
+                // Place cubes on x + z = wallCenterZ so the wall faces the isometric camera head-on.
                 float realZ = wallCenterZ - realX;
                 int color = ((column + row) % 2 == 0) ? WALL_COLOR_A : WALL_COLOR_B;
                 int indexBeforeAdd = data.count;

@@ -21,6 +21,7 @@ public class IsoCanvas extends JPanel {
     private static final Color ROOM_BACK_WALL = new Color(0xDFE5EE);
     private static final Color ROOM_SIDE_WALL = new Color(0xD5DDE8);
     private static final Color BUTTON_OUTLINE = new Color(0x101010);
+    private static final float ROOM_WALL_HEIGHT = 450.0f;
     private static final float SCENE_BOUNDS_INITIAL_MAX_HEIGHT = 180.0f;
     private static final int HUD_CORNER_RADIUS = 12;
     
@@ -122,7 +123,7 @@ public class IsoCanvas extends JPanel {
 
     private void drawGround(Graphics2D g, int cx, int cy) {
         int worldHalfExtent = 700;
-        float groundY = 0.5f;
+        float groundY = 0.5f; // Small lift avoids z-fighting flicker against cubes resting on the floor.
         int[] p0 = project(-worldHalfExtent, groundY, -worldHalfExtent, cx, cy);
         int[] p1 = project(worldHalfExtent, groundY, -worldHalfExtent, cx, cy);
         int[] p2 = project(worldHalfExtent, groundY, worldHalfExtent, cx, cy);
@@ -140,7 +141,7 @@ public class IsoCanvas extends JPanel {
     }
 
     private void drawRoomBackdrop(Graphics2D g, int halfExtent, float floorY, int cx, int cy) {
-        float wallTopY = floorY + 450.0f;
+        float wallTopY = floorY + ROOM_WALL_HEIGHT;
         int[] backL = project(-halfExtent, floorY, halfExtent, cx, cy);
         int[] backR = project(halfExtent, floorY, halfExtent, cx, cy);
         int[] backRT = project(halfExtent, wallTopY, halfExtent, cx, cy);
