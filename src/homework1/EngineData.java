@@ -35,6 +35,10 @@ public class EngineData {
     
     // 提供一个快速添加方块的方法
     public void addCube(float x, float y, float z, float s, int hexColor) {
+        addCube(x, y, z, s, hexColor, true);
+    }
+
+    public void addCube(float x, float y, float z, float s, int hexColor, boolean withInitialPerturbation) {
         if (count >= MAX_ENTITIES) return; // 防止越界
         xPos[count] = x;
         yPos[count] = y;
@@ -42,13 +46,22 @@ public class EngineData {
         size[count] = s;
         colors[count] = hexColor;
 
-        // 初始微扰：避免所有方块完美对齐
-        rotX[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
-        rotY[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
-        rotZ[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
-        avX[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
-        avY[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
-        avZ[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+        if (withInitialPerturbation) {
+            // 初始微扰：避免所有方块完美对齐
+            rotX[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
+            rotY[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
+            rotZ[count] = (random.nextFloat() - 0.5f) * INITIAL_ROTATION_RANGE;
+            avX[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+            avY[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+            avZ[count] = (random.nextFloat() - 0.5f) * INITIAL_ANGULAR_VEL_RANGE;
+        } else {
+            rotX[count] = 0.0f;
+            rotY[count] = 0.0f;
+            rotZ[count] = 0.0f;
+            avX[count] = 0.0f;
+            avY[count] = 0.0f;
+            avZ[count] = 0.0f;
+        }
         count++;
     }
 }

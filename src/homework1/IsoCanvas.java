@@ -15,6 +15,10 @@ public class IsoCanvas extends JPanel {
     private static final Color BOUNDS_COLOR = new Color(120, 230, 255, 150);
     private static final Color HUD_BG = new Color(0, 0, 0, 130);
     private static final Color HUD_TEXT = new Color(0xEAF4FF);
+    private static final Color ROOM_BACKGROUND = new Color(0xF4F6FA);
+    private static final Color ROOM_FLOOR = new Color(0xE3E8EF);
+    private static final Color ROOM_FLOOR_EDGE = new Color(0xCED6E2);
+    private static final Color BUTTON_OUTLINE = new Color(0x101010);
     private static final float SCENE_BOUNDS_INITIAL_MAX_HEIGHT = 180.0f;
     private static final int HUD_CORNER_RADIUS = 12;
     
@@ -23,6 +27,9 @@ public class IsoCanvas extends JPanel {
     private float renderFps = 0.0f;
     private float physicsFps = 0.0f;
     private int blockCount = 0;
+    private boolean insideRoomMode = false;
+    private int enterButtonIndex = -1;
+    private int returnButtonIndex = -1;
     
     public IsoCanvas(EngineData data) {
         this.data = data;
@@ -39,6 +46,15 @@ public class IsoCanvas extends JPanel {
         this.blockCount = blockCount;
         this.renderFps = renderFps;
         this.physicsFps = physicsFps;
+    }
+
+    public void setInsideRoomMode(boolean insideRoomMode) {
+        this.insideRoomMode = insideRoomMode;
+    }
+
+    public void setMenuButtonIndices(int enterButtonIndex, int returnButtonIndex) {
+        this.enterButtonIndex = enterButtonIndex;
+        this.returnButtonIndex = returnButtonIndex;
     }
 
     @Override
@@ -73,7 +89,8 @@ public class IsoCanvas extends JPanel {
         for (int n = 0; n < data.count; n++) {
             int i = order[n];
             drawIsoCube(g2d, data.xPos[i], data.yPos[i], data.zPos[i], data.size[i],
-                    data.rotX[i], data.rotY[i], data.rotZ[i], data.colors[i], cx, cy);
+                    data.rotX[i], data.rotY[i], data.rotZ[i], data.colors[i], cx, cy,
+                    i == enterButtonIndex || i == returnButtonIndex);
         }
 
         drawHud(g2d);
@@ -86,6 +103,11 @@ public class IsoCanvas extends JPanel {
     }
 
     private void drawBackground(Graphics2D g) {
+        if (insideRoomMode) {
+            g.setColor(ROOM_BACKGROUND);
+            g.fillRect(0, 0, getWidth(), getHeight());
+            return;
+        }
         GradientPaint gradient = new GradientPaint(
                 0, 0, BACKGROUND_TOP,
                 0, getHeight(), BACKGROUND_BOTTOM
@@ -105,9 +127,9 @@ public class IsoCanvas extends JPanel {
 
         int[] xs = new int[]{p0[0], p1[0], p2[0], p3[0]};
         int[] ys = new int[]{p0[1], p1[1], p2[1], p3[1]};
-        g.setColor(GROUND_COLOR);
+        g.setColor(insideRoomMode ? ROOM_FLOOR : GROUND_COLOR);
         g.fillPolygon(xs, ys, 4);
-        g.setColor(GROUND_EDGE_COLOR);
+        g.setColor(insideRoomMode ? ROOM_FLOOR_EDGE : GROUND_EDGE_COLOR);
         g.drawPolygon(xs, ys, 4);
     }
 
@@ -187,7 +209,8 @@ public class IsoCanvas extends JPanel {
     }
 
     private void drawIsoCube(Graphics2D g, float x, float y, float z, float s,
-                             float rotX, float rotY, float rotZ, int hexColor, int cx, int cy) {
+                             float rotX, float rotY, float rotZ, int hexColor, int cx, int cy,
+                             boolean menuButton) {
         int r = (hexColor >> 16) & 0xFF, gg = (hexColor >> 8) & 0xFF, b = hexColor & 0xFF;
         Color topColor = new Color(r, gg, b);
         Color midColor = new Color((int) (r * 0.75f), (int) (gg * 0.75f), (int) (b * 0.75f));
@@ -232,9 +255,10 @@ public class IsoCanvas extends JPanel {
                 {0, 0, -1}
         };
 
-        float viewX = 0.0f;
+        // 该等轴相机从 (+X,+Y,+Z) 方向观察场景，使用对应视线方向做面剔除可避免“面缺失”。
+        float viewX = 1.0f;
         float viewY = 1.0f;
-        float viewZ = -1.0f;
+        float viewZ = 1.0f;
 
         float sinX = (float) Math.sin(rotX), cosX = (float) Math.cos(rotX);
         float sinY = (float) Math.sin(rotY), cosY = (float) Math.cos(rotY);
@@ -279,7 +303,7 @@ public class IsoCanvas extends JPanel {
                     sinX, cosX, sinY, cosY, sinZ, cosZ
             );
             float dot = rotatedNormal[0] * viewX + rotatedNormal[1] * viewY + rotatedNormal[2] * viewZ;
-            if (dot <= 0.0f) {
+            if (dot >= 0.0f) {
                 continue;
             }
 
@@ -289,7 +313,7 @@ public class IsoCanvas extends JPanel {
 
             g.setColor(faceColors[f]);
             g.fillPolygon(xs, ys, 4);
-            g.setColor(new Color(0x111111));
+            g.setColor(menuButton ? BUTTON_OUTLINE : new Color(0x111111));
             g.drawPolygon(xs, ys, 4);
         }
     }

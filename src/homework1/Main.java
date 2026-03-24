@@ -9,10 +9,8 @@ import javax.swing.JFrame;
 import javax.swing.Timer;
 
 public class Main {
-    private static final float SPAWN_HEIGHT_MIN = 400f;
-    private static final float SPAWN_HEIGHT_RANGE = 400f;
     // Explosion strength scalar used by PhysicsCore.applyExplosionImpulse.
-    private static final float EXPLOSION_FORCE = 60000f;
+    private static final float EXPLOSION_FORCE = 85000f;
     private static final float FIXED_DT = 1.0f / 60.0f;
     private static final float MAX_FRAME_DT = 0.25f;
     private static final int MAX_SUBSTEPS_PER_FRAME = 4;
@@ -22,13 +20,28 @@ public class Main {
     private static final float TARGET_PHYSICS_FPS = 1.0f / FIXED_DT;
     private static final float FPS_SMOOTHING_FACTOR = 0.9f;
     private static final float MIN_FRAME_TIME = 1.0e-6f;
+    private static final int ENTER_BUTTON_COLOR = 0xD72F2F;
+    private static final int RETURN_BUTTON_COLOR = 0x2FA84F;
+    private static final int WALL_COLOR_A = 0xD7DDE6;
+    private static final int WALL_COLOR_B = 0xBEC8D4;
+    private static final float BUTTON_HIT_RADIUS_SCALE = 0.70f;
+
+    private static final class SceneSetup {
+        EngineData data;
+        int enterButtonIndex;
+        float wallCenterX;
+        float wallCenterY;
+        float wallCenterZ;
+    }
     
     public static void main(String[] args) {
         // 1. 初始化数据引擎 (Model 层)
-        EngineData data = createInitialScene();
+        SceneSetup setup = createInitialScene();
+        EngineData data = setup.data;
         
         // 3. 将数据层丢给渲染画布 (View 层)
         IsoCanvas canvas = new IsoCanvas(data);
+        canvas.setMenuButtonIndices(setup.enterButtonIndex, -1);
         
         // 4. 装载并显示窗口
         JFrame frame = new JFrame("Hardcore Engine v0.3 - AI Agent Ready");
@@ -39,11 +52,11 @@ public class Main {
         frame.setVisible(true);
 
         // 5. 启动核心引擎与交互！
-        engineStart(canvas, data);
+        engineStart(canvas, setup);
     }
 
     // 核心调度器：包含物理主循环和输入监听
-    public static void engineStart(IsoCanvas canvas, EngineData data) {
+    public static void engineStart(IsoCanvas canvas, SceneSetup setup) {
         final class LoopState {
             long lastTickNanos;
             float accumulator = 0.0f;
@@ -51,12 +64,40 @@ public class Main {
             float physicsFpsSmoothed = 0.0f;
             PhysicsCore physicsCore;
             EngineData engineData;
+            int enterButtonIndex = -1;
+            int returnButtonIndex = -1;
+            float wallCenterX;
+            float wallCenterY;
+            float wallCenterZ;
+            boolean physicsActive = false;
+            final Random random = new Random(EngineData.RANDOM_SEED + 2026L);
         }
         final LoopState loopState = new LoopState();
         
         // 初始化物理核心 (你刚才新建的包含 TODO 的占位类)
-        loopState.engineData = data;
-        loopState.physicsCore = new PhysicsCore(data);
+        loopState.engineData = setup.data;
+        loopState.physicsCore = null;
+        loopState.enterButtonIndex = setup.enterButtonIndex;
+        loopState.wallCenterX = setup.wallCenterX;
+        loopState.wallCenterY = setup.wallCenterY;
+        loopState.wallCenterZ = setup.wallCenterZ;
+        Runnable resetScene = () -> {
+            SceneSetup resetSetup = createInitialScene();
+            loopState.engineData = resetSetup.data;
+            loopState.physicsCore = null;
+            loopState.physicsActive = false;
+            loopState.enterButtonIndex = resetSetup.enterButtonIndex;
+            loopState.returnButtonIndex = -1;
+            loopState.wallCenterX = resetSetup.wallCenterX;
+            loopState.wallCenterY = resetSetup.wallCenterY;
+            loopState.wallCenterZ = resetSetup.wallCenterZ;
+            canvas.setData(resetSetup.data);
+            canvas.setInsideRoomMode(false);
+            canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
+            canvas.setDebugStats(loopState.engineData.count,
+                    loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
+            canvas.repaint();
+        };
 
         // 1. 游戏主循环 (Game Loop) - 锁定约 60 FPS (16ms)
         Timer gameLoop = new Timer(16, e -> {
@@ -74,7 +115,7 @@ public class Main {
             }
 
             int substeps = 0;
-            while (loopState.accumulator >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
+            while (loopState.physicsActive && loopState.accumulator >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
                 loopState.physicsCore.stepSimulation(FIXED_DT);
                 loopState.accumulator -= FIXED_DT;
                 substeps++;
@@ -100,13 +141,7 @@ public class Main {
             @Override
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_R) {
-                    EngineData resetData = createInitialScene();
-                    loopState.engineData = resetData;
-                    loopState.physicsCore = new PhysicsCore(resetData);
-                    canvas.setData(resetData);
-                    canvas.setDebugStats(loopState.engineData.count,
-                            loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
-                    canvas.repaint();
+                    resetScene.run();
                 }
             }
         });
@@ -118,6 +153,28 @@ public class Main {
                 int mouseX = e.getX();
                 int mouseY = e.getY();
 
+                if (loopState.returnButtonIndex < 0) {
+                    if (isCubeClicked(loopState.engineData, loopState.enterButtonIndex, mouseX, mouseY, canvas)) {
+                        loopState.returnButtonIndex = pickReturnButtonIndex(
+                                loopState.engineData, loopState.enterButtonIndex, loopState.random);
+                        if (loopState.returnButtonIndex >= 0) {
+                            loopState.engineData.colors[loopState.returnButtonIndex] = RETURN_BUTTON_COLOR;
+                        }
+                        loopState.physicsCore = new PhysicsCore(loopState.engineData);
+                        loopState.physicsActive = true;
+                        canvas.setInsideRoomMode(true);
+                        canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
+                        loopState.physicsCore.applyExplosionImpulse(
+                                loopState.wallCenterX, loopState.wallCenterY, loopState.wallCenterZ, EXPLOSION_FORCE);
+                        canvas.requestFocusInWindow();
+                        return;
+                    }
+                } else if (isCubeClicked(loopState.engineData, loopState.returnButtonIndex, mouseX, mouseY, canvas)) {
+                    resetScene.run();
+                    canvas.requestFocusInWindow();
+                    return;
+                }
+
                 int cx = canvas.getWidth() / 2;
                 int cy = canvas.getHeight() / 2 + VIEW_Y_OFFSET;
                 float u = (mouseX - cx) / ISO_A;
@@ -125,27 +182,77 @@ public class Main {
                 float worldX = 0.5f * (u + v);
                 float worldZ = 0.5f * (v - u);
 
-                loopState.physicsCore.applyExplosionImpulse(worldX, 0.0f, worldZ, EXPLOSION_FORCE);
-                System.out.println("[Debug脚手架] 鼠标点击了屏幕坐标: X=" + mouseX + ", Y=" + mouseY);
+                if (loopState.physicsActive && loopState.physicsCore != null) {
+                    loopState.physicsCore.applyExplosionImpulse(worldX, 0.0f, worldZ, EXPLOSION_FORCE);
+                }
                 canvas.requestFocusInWindow();
             }
         });
     }
 
-    private static EngineData createInitialScene() {
+    private static SceneSetup createInitialScene() {
+        SceneSetup setup = new SceneSetup();
         EngineData data = new EngineData();
-        Random random = new Random(EngineData.RANDOM_SEED);
 
-        float cubeSize = 50f;
-        for (int z = 4; z >= 0; z--) {
-            for (int x = 0; x < 5; x++) {
-                float realX = x * (cubeSize + 2);
-                float realZ = z * (cubeSize + 2);
-                float realY = SPAWN_HEIGHT_MIN + random.nextFloat() * SPAWN_HEIGHT_RANGE;
-                int color = ((x + z) % 2 == 0) ? 0x00ADB5 : 0x008A93;
-                data.addCube(realX, realY, realZ, cubeSize, color);
+        float cubeSize = 44f;
+        float spacing = cubeSize + 2f;
+        int wallColumns = 12;
+        int wallRows = 8;
+        float wallOriginX = -((wallColumns - 1) * spacing) * 0.5f;
+        float wallOriginZ = 0f;
+
+        int enterColumn = wallColumns / 2;
+        int enterRow = wallRows / 2;
+
+        for (int row = 0; row < wallRows; row++) {
+            for (int column = 0; column < wallColumns; column++) {
+                float realX = wallOriginX + column * spacing;
+                float realY = row * spacing;
+                float realZ = wallOriginZ;
+                int color = ((column + row) % 2 == 0) ? WALL_COLOR_A : WALL_COLOR_B;
+                int indexBeforeAdd = data.count;
+                data.addCube(realX, realY, realZ, cubeSize, color, false);
+                if (column == enterColumn && row == enterRow) {
+                    setup.enterButtonIndex = indexBeforeAdd;
+                }
             }
         }
-        return data;
+        if (setup.enterButtonIndex >= 0 && setup.enterButtonIndex < data.count) {
+            data.colors[setup.enterButtonIndex] = ENTER_BUTTON_COLOR;
+        }
+
+        setup.data = data;
+        setup.wallCenterX = wallOriginX + (wallColumns - 1) * spacing * 0.5f;
+        setup.wallCenterY = (wallRows - 1) * spacing * 0.5f;
+        setup.wallCenterZ = wallOriginZ + cubeSize * 0.5f;
+        return setup;
+    }
+
+    private static int pickReturnButtonIndex(EngineData data, int enterButtonIndex, Random random) {
+        if (data.count <= 1) {
+            return -1;
+        }
+        int idx = random.nextInt(data.count - 1);
+        if (idx >= enterButtonIndex) {
+            idx += 1;
+        }
+        return idx;
+    }
+
+    private static boolean isCubeClicked(EngineData data, int cubeIndex, int mouseX, int mouseY, IsoCanvas canvas) {
+        if (cubeIndex < 0 || cubeIndex >= data.count) {
+            return false;
+        }
+        float centerX = data.xPos[cubeIndex] + data.size[cubeIndex] * 0.5f;
+        float centerY = data.yPos[cubeIndex] + data.size[cubeIndex] * 0.5f;
+        float centerZ = data.zPos[cubeIndex] + data.size[cubeIndex] * 0.5f;
+        int cx = canvas.getWidth() / 2;
+        int cy = canvas.getHeight() / 2 + VIEW_Y_OFFSET;
+        int screenX = (int) ((centerX - centerZ) * ISO_A) + cx;
+        int screenY = (int) ((centerX + centerZ) * ISO_B - centerY) + cy;
+        float dx = mouseX - screenX;
+        float dy = mouseY - screenY;
+        float hitRadius = data.size[cubeIndex] * BUTTON_HIT_RADIUS_SCALE;
+        return dx * dx + dy * dy <= hitRadius * hitRadius;
     }
 }
