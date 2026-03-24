@@ -1,6 +1,8 @@
 package homework1;
 
 import java.awt.event.MouseAdapter;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.Random;
 import javax.swing.JFrame;
@@ -17,25 +19,11 @@ public class Main {
     private static final float ISO_A = 0.866025f;
     private static final float ISO_B = 0.5f;
     private static final int VIEW_Y_OFFSET = 150;
+    private static final int PHYSICS_STEP_RATE = 60;
     
     public static void main(String[] args) {
         // 1. 初始化数据引擎 (Model 层)
-        EngineData data = new EngineData();
-        Random random = new Random(EngineData.RANDOM_SEED);
-        
-        // 2. 生成测试场景：一个 5x5 的地面阵列
-        float cubeSize = 50f;
-        // 极其讲究的嵌套遍历顺序：从后往前，确保远处的先画，解决深度遮挡
-        for (int z = 4; z >= 0; z--) {
-            for (int x = 0; x < 5; x++) {
-                float realX = x * (cubeSize + 2);
-                float realZ = z * (cubeSize + 2);
-                float realY = SPAWN_HEIGHT_MIN + random.nextFloat() * SPAWN_HEIGHT_RANGE;
-                
-                int color = ((x + z) % 2 == 0) ? 0x00ADB5 : 0x008A93; 
-                data.addCube(realX, realY, realZ, cubeSize, color);
-            }
-        }
+        EngineData data = createInitialScene();
         
         // 3. 将数据层丢给渲染画布 (View 层)
         IsoCanvas canvas = new IsoCanvas(data);
@@ -57,11 +45,16 @@ public class Main {
         final class LoopState {
             long lastTickNanos;
             float accumulator = 0.0f;
+            float frameFpsSmoothed = 0.0f;
+            float physicsFpsSmoothed = PHYSICS_STEP_RATE;
+            PhysicsCore physicsCore;
+            EngineData engineData;
         }
         final LoopState loopState = new LoopState();
         
         // 初始化物理核心 (你刚才新建的包含 TODO 的占位类)
-        PhysicsCore physics = new PhysicsCore(data);
+        loopState.engineData = data;
+        loopState.physicsCore = new PhysicsCore(data);
 
         // 1. 游戏主循环 (Game Loop) - 锁定约 60 FPS (16ms)
         Timer gameLoop = new Timer(16, e -> {
@@ -70,21 +63,47 @@ public class Main {
             loopState.lastTickNanos = now;
             frameDt = Math.min(frameDt, MAX_FRAME_DT);
             loopState.accumulator += frameDt;
+            if (frameDt > 0.0f) {
+                float frameFpsInstant = 1.0f / frameDt;
+                loopState.frameFpsSmoothed = (loopState.frameFpsSmoothed <= 0.0f)
+                        ? frameFpsInstant
+                        : loopState.frameFpsSmoothed * 0.9f + frameFpsInstant * 0.1f;
+            }
 
             int substeps = 0;
             while (loopState.accumulator >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
-                physics.stepSimulation(FIXED_DT);
+                loopState.physicsCore.stepSimulation(FIXED_DT);
                 loopState.accumulator -= FIXED_DT;
                 substeps++;
             }
             if (substeps == MAX_SUBSTEPS_PER_FRAME) {
                 loopState.accumulator = 0.0f;
             }
+            float physicsFpsInstant = substeps / Math.max(frameDt, 1.0e-6f);
+            loopState.physicsFpsSmoothed = loopState.physicsFpsSmoothed * 0.9f + physicsFpsInstant * 0.1f;
+            canvas.setDebugStats(loopState.engineData.count, loopState.frameFpsSmoothed, loopState.physicsFpsSmoothed);
             canvas.repaint(); // 触发 IsoCanvas 重新画图
         });
         loopState.lastTickNanos = System.nanoTime();
         gameLoop.start();
 
+        canvas.setFocusable(true);
+        canvas.requestFocusInWindow();
+        canvas.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_R) {
+                    EngineData resetData = createInitialScene();
+                    loopState.engineData = resetData;
+                    loopState.physicsCore = new PhysicsCore(resetData);
+                    canvas.setData(resetData);
+                    canvas.setDebugStats(loopState.engineData.count,
+                            loopState.frameFpsSmoothed, loopState.physicsFpsSmoothed);
+                    canvas.repaint();
+                }
+            }
+        });
+ 
         // 2. 交互监听器占位 - 给云端 AI 留的外包作业
         canvas.addMouseListener(new MouseAdapter() {
             @Override
@@ -99,9 +118,27 @@ public class Main {
                 float worldX = 0.5f * (u + v);
                 float worldZ = 0.5f * (v - u);
 
-                physics.applyExplosionImpulse(worldX, 0.0f, worldZ, EXPLOSION_FORCE);
+                loopState.physicsCore.applyExplosionImpulse(worldX, 0.0f, worldZ, EXPLOSION_FORCE);
                 System.out.println("[Debug脚手架] 鼠标点击了屏幕坐标: X=" + mouseX + ", Y=" + mouseY);
+                canvas.requestFocusInWindow();
             }
         });
+    }
+
+    private static EngineData createInitialScene() {
+        EngineData data = new EngineData();
+        Random random = new Random(EngineData.RANDOM_SEED);
+
+        float cubeSize = 50f;
+        for (int z = 4; z >= 0; z--) {
+            for (int x = 0; x < 5; x++) {
+                float realX = x * (cubeSize + 2);
+                float realZ = z * (cubeSize + 2);
+                float realY = SPAWN_HEIGHT_MIN + random.nextFloat() * SPAWN_HEIGHT_RANGE;
+                int color = ((x + z) % 2 == 0) ? 0x00ADB5 : 0x008A93;
+                data.addCube(realX, realY, realZ, cubeSize, color);
+            }
+        }
+        return data;
     }
 }
