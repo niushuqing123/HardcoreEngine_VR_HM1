@@ -1,13 +1,17 @@
 package homework1;
 
 public final class Matrix4f {
-    public final float[] m;
+    private final float[] m;
 
     public Matrix4f(float[] values) {
         if (values == null || values.length != 16) {
             throw new IllegalArgumentException("Matrix4f requires exactly 16 values.");
         }
         this.m = values.clone();
+    }
+
+    public float[] values() {
+        return m.clone();
     }
 
     public static Matrix4f identity() {
