@@ -18,6 +18,8 @@ public class RasterCanvas extends JPanel {
     private static final float CAMERA_NEAR = 0.1f;
     private static final float CAMERA_FAR = 5000.0f;
     private static final float W_EPSILON = 1.0e-6f;
+    private static final int MAX_FACE_SHADE_INDEX = 5;
+    private static final float FACE_SHADE_STEP = 0.10f;
     private static final float[][] CUBE_VERTICES = {
             {-0.5f, -0.5f, -0.5f},
             {0.5f, -0.5f, -0.5f},
@@ -91,7 +93,7 @@ public class RasterCanvas extends JPanel {
     }
 
     private static int shadeFaceColor(int baseColor, int faceIndex) {
-        float shade = 1.0f - Math.min(faceIndex, 5) * 0.10f;
+        float shade = 1.0f - Math.min(faceIndex, MAX_FACE_SHADE_INDEX) * FACE_SHADE_STEP;
         int r = (baseColor >> 16) & 0xFF;
         int g = (baseColor >> 8) & 0xFF;
         int b = baseColor & 0xFF;
@@ -155,7 +157,7 @@ public class RasterCanvas extends JPanel {
                                 Matrix4f.createRotationX(data.rotX[index]))));
         Matrix4f mvp = Matrix4f.multiply(viewProjMatrix, model);
 
-        float[][] transformed = new float[8][];
+        float[][] transformed = new float[CUBE_VERTICES.length][];
         for (int v = 0; v < 8; v++) {
             float lx = CUBE_VERTICES[v][0] * cubeSize;
             float ly = CUBE_VERTICES[v][1] * cubeSize;
