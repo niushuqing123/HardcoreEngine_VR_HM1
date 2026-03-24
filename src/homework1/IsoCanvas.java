@@ -18,6 +18,8 @@ public class IsoCanvas extends JPanel {
     private static final Color ROOM_BACKGROUND = new Color(0xF4F6FA);
     private static final Color ROOM_FLOOR = new Color(0xE3E8EF);
     private static final Color ROOM_FLOOR_EDGE = new Color(0xCED6E2);
+    private static final Color ROOM_BACK_WALL = new Color(0xDFE5EE);
+    private static final Color ROOM_SIDE_WALL = new Color(0xD5DDE8);
     private static final Color BUTTON_OUTLINE = new Color(0x101010);
     private static final float SCENE_BOUNDS_INITIAL_MAX_HEIGHT = 180.0f;
     private static final int HUD_CORNER_RADIUS = 12;
@@ -120,10 +122,11 @@ public class IsoCanvas extends JPanel {
 
     private void drawGround(Graphics2D g, int cx, int cy) {
         int worldHalfExtent = 700;
-        int[] p0 = project(-worldHalfExtent, 0.0f, -worldHalfExtent, cx, cy);
-        int[] p1 = project(worldHalfExtent, 0.0f, -worldHalfExtent, cx, cy);
-        int[] p2 = project(worldHalfExtent, 0.0f, worldHalfExtent, cx, cy);
-        int[] p3 = project(-worldHalfExtent, 0.0f, worldHalfExtent, cx, cy);
+        float groundY = 0.5f;
+        int[] p0 = project(-worldHalfExtent, groundY, -worldHalfExtent, cx, cy);
+        int[] p1 = project(worldHalfExtent, groundY, -worldHalfExtent, cx, cy);
+        int[] p2 = project(worldHalfExtent, groundY, worldHalfExtent, cx, cy);
+        int[] p3 = project(-worldHalfExtent, groundY, worldHalfExtent, cx, cy);
 
         int[] xs = new int[]{p0[0], p1[0], p2[0], p3[0]};
         int[] ys = new int[]{p0[1], p1[1], p2[1], p3[1]};
@@ -131,6 +134,28 @@ public class IsoCanvas extends JPanel {
         g.fillPolygon(xs, ys, 4);
         g.setColor(insideRoomMode ? ROOM_FLOOR_EDGE : GROUND_EDGE_COLOR);
         g.drawPolygon(xs, ys, 4);
+        if (insideRoomMode) {
+            drawRoomBackdrop(g, worldHalfExtent, groundY, cx, cy);
+        }
+    }
+
+    private void drawRoomBackdrop(Graphics2D g, int halfExtent, float floorY, int cx, int cy) {
+        float wallTopY = floorY + 450.0f;
+        int[] backL = project(-halfExtent, floorY, halfExtent, cx, cy);
+        int[] backR = project(halfExtent, floorY, halfExtent, cx, cy);
+        int[] backRT = project(halfExtent, wallTopY, halfExtent, cx, cy);
+        int[] backLT = project(-halfExtent, wallTopY, halfExtent, cx, cy);
+        g.setColor(ROOM_BACK_WALL);
+        g.fillPolygon(new int[]{backL[0], backR[0], backRT[0], backLT[0]},
+                new int[]{backL[1], backR[1], backRT[1], backLT[1]}, 4);
+
+        int[] sideF = project(halfExtent, floorY, -halfExtent, cx, cy);
+        int[] sideB = project(halfExtent, floorY, halfExtent, cx, cy);
+        int[] sideBT = project(halfExtent, wallTopY, halfExtent, cx, cy);
+        int[] sideFT = project(halfExtent, wallTopY, -halfExtent, cx, cy);
+        g.setColor(ROOM_SIDE_WALL);
+        g.fillPolygon(new int[]{sideF[0], sideB[0], sideBT[0], sideFT[0]},
+                new int[]{sideF[1], sideB[1], sideBT[1], sideFT[1]}, 4);
     }
 
     private void drawGroundShadow(Graphics2D g, float x, float z, float s, int cx, int cy) {

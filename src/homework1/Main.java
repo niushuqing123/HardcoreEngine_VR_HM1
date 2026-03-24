@@ -25,6 +25,8 @@ public class Main {
     private static final int WALL_COLOR_A = 0xD7DDE6;
     private static final int WALL_COLOR_B = 0xBEC8D4;
     private static final float BUTTON_HIT_RADIUS_SCALE = 0.70f;
+    private static final float WALL_DIAGONAL_DEPTH = 320.0f;
+    private static final float WALL_BASE_Y = 170.0f;
 
     private static final class SceneSetup {
         EngineData data;
@@ -198,8 +200,9 @@ public class Main {
         float spacing = cubeSize + 2f;
         int wallColumns = 12;
         int wallRows = 8;
-        float wallOriginX = -((wallColumns - 1) * spacing) * 0.5f;
-        float wallOriginZ = 0f;
+        float wallCenterX = WALL_DIAGONAL_DEPTH * 0.5f;
+        float wallCenterZ = WALL_DIAGONAL_DEPTH;
+        float wallOriginX = wallCenterX - ((wallColumns - 1) * spacing) * 0.5f;
 
         int enterColumn = wallColumns / 2;
         int enterRow = wallRows / 2;
@@ -207,8 +210,8 @@ public class Main {
         for (int row = 0; row < wallRows; row++) {
             for (int column = 0; column < wallColumns; column++) {
                 float realX = wallOriginX + column * spacing;
-                float realY = row * spacing;
-                float realZ = wallOriginZ;
+                float realY = WALL_BASE_Y + row * spacing;
+                float realZ = wallCenterZ - realX;
                 int color = ((column + row) % 2 == 0) ? WALL_COLOR_A : WALL_COLOR_B;
                 int indexBeforeAdd = data.count;
                 data.addCube(realX, realY, realZ, cubeSize, color, false);
@@ -222,9 +225,9 @@ public class Main {
         }
 
         setup.data = data;
-        setup.wallCenterX = wallOriginX + (wallColumns - 1) * spacing * 0.5f;
-        setup.wallCenterY = (wallRows - 1) * spacing * 0.5f;
-        setup.wallCenterZ = wallOriginZ + cubeSize * 0.5f;
+        setup.wallCenterX = wallCenterX;
+        setup.wallCenterY = WALL_BASE_Y + (wallRows - 1) * spacing * 0.5f;
+        setup.wallCenterZ = wallCenterZ + cubeSize * 0.5f;
         return setup;
     }
 
