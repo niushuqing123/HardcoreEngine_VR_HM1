@@ -90,4 +90,13 @@ public final class Matrix4f {
         }
         return new Matrix4f(out);
     }
+
+    public float[] transform(float x, float y, float z, float w) {
+        return new float[]{
+                m[0] * x + m[1] * y + m[2] * z + m[3] * w,
+                m[4] * x + m[5] * y + m[6] * z + m[7] * w,
+                m[8] * x + m[9] * y + m[10] * z + m[11] * w,
+                m[12] * x + m[13] * y + m[14] * z + m[15] * w
+        };
+    }
 }
