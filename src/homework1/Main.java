@@ -9,6 +9,10 @@ import javax.swing.Timer;
 public class Main {
     private static final float SPAWN_HEIGHT_MIN = 400f;
     private static final float SPAWN_HEIGHT_RANGE = 400f;
+    private static final float EXPLOSION_FORCE = 60000f;
+    private static final float ISO_A = 0.866025f;
+    private static final float ISO_B = 0.5f;
+    private static final int VIEW_Y_OFFSET = 150;
     
     public static void main(String[] args) {
         // 1. 初始化数据引擎 (Model 层)
@@ -63,10 +67,15 @@ public class Main {
             public void mouseClicked(MouseEvent e) {
                 int mouseX = e.getX();
                 int mouseY = e.getY();
-                
-                // TODO: AI Agent, implement Inverse Isometric Raycasting here!
-                // Map screen (mouseX, mouseY) back to the 3D grid and highlight the clicked cube.
-                // Or trigger the explosion at the clicked location.
+
+                int cx = canvas.getWidth() / 2;
+                int cy = canvas.getHeight() / 2 + VIEW_Y_OFFSET;
+                float u = (mouseX - cx) / ISO_A;
+                float v = (mouseY - cy) / ISO_B;
+                float worldX = 0.5f * (u + v);
+                float worldZ = 0.5f * (v - u);
+
+                physics.applyExplosionImpulse(worldX, 0.0f, worldZ, EXPLOSION_FORCE);
                 System.out.println("[Debug脚手架] 鼠标点击了屏幕坐标: X=" + mouseX + ", Y=" + mouseY);
             }
         });
