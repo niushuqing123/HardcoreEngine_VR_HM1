@@ -255,6 +255,7 @@ public class IsoCanvas extends JPanel {
                 {0, 0, -1}
         };
 
+        // 该等轴相机从 (+X,+Y,+Z) 方向观察场景，使用对应视线方向做面剔除可避免“面缺失”。
         float viewX = 1.0f;
         float viewY = 1.0f;
         float viewZ = 1.0f;

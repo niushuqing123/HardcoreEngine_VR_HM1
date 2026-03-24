@@ -81,6 +81,23 @@ public class Main {
         loopState.wallCenterX = setup.wallCenterX;
         loopState.wallCenterY = setup.wallCenterY;
         loopState.wallCenterZ = setup.wallCenterZ;
+        Runnable resetScene = () -> {
+            SceneSetup resetSetup = createInitialScene();
+            loopState.engineData = resetSetup.data;
+            loopState.physicsCore = null;
+            loopState.physicsActive = false;
+            loopState.enterButtonIndex = resetSetup.enterButtonIndex;
+            loopState.returnButtonIndex = -1;
+            loopState.wallCenterX = resetSetup.wallCenterX;
+            loopState.wallCenterY = resetSetup.wallCenterY;
+            loopState.wallCenterZ = resetSetup.wallCenterZ;
+            canvas.setData(resetSetup.data);
+            canvas.setInsideRoomMode(false);
+            canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
+            canvas.setDebugStats(loopState.engineData.count,
+                    loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
+            canvas.repaint();
+        };
 
         // 1. 游戏主循环 (Game Loop) - 锁定约 60 FPS (16ms)
         Timer gameLoop = new Timer(16, e -> {
@@ -124,21 +141,7 @@ public class Main {
             @Override
             public void keyPressed(KeyEvent e) {
                 if (e.getKeyCode() == KeyEvent.VK_R) {
-                    SceneSetup resetSetup = createInitialScene();
-                    loopState.engineData = resetSetup.data;
-                    loopState.physicsCore = null;
-                    loopState.physicsActive = false;
-                    loopState.enterButtonIndex = resetSetup.enterButtonIndex;
-                    loopState.returnButtonIndex = -1;
-                    loopState.wallCenterX = resetSetup.wallCenterX;
-                    loopState.wallCenterY = resetSetup.wallCenterY;
-                    loopState.wallCenterZ = resetSetup.wallCenterZ;
-                    canvas.setData(resetSetup.data);
-                    canvas.setInsideRoomMode(false);
-                    canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
-                    canvas.setDebugStats(loopState.engineData.count,
-                            loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
-                    canvas.repaint();
+                    resetScene.run();
                 }
             }
         });
@@ -167,21 +170,7 @@ public class Main {
                         return;
                     }
                 } else if (isCubeClicked(loopState.engineData, loopState.returnButtonIndex, mouseX, mouseY, canvas)) {
-                    SceneSetup resetSetup = createInitialScene();
-                    loopState.engineData = resetSetup.data;
-                    loopState.physicsCore = null;
-                    loopState.physicsActive = false;
-                    loopState.enterButtonIndex = resetSetup.enterButtonIndex;
-                    loopState.returnButtonIndex = -1;
-                    loopState.wallCenterX = resetSetup.wallCenterX;
-                    loopState.wallCenterY = resetSetup.wallCenterY;
-                    loopState.wallCenterZ = resetSetup.wallCenterZ;
-                    canvas.setData(resetSetup.data);
-                    canvas.setInsideRoomMode(false);
-                    canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
-                    canvas.setDebugStats(loopState.engineData.count,
-                            loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
-                    canvas.repaint();
+                    resetScene.run();
                     canvas.requestFocusInWindow();
                     return;
                 }
