@@ -11,6 +11,9 @@ public class Main {
     private static final float SPAWN_HEIGHT_RANGE = 400f;
     // Explosion strength scalar used by PhysicsCore.applyExplosionImpulse.
     private static final float EXPLOSION_FORCE = 60000f;
+    private static final float FIXED_DT = 1.0f / 60.0f;
+    private static final float MAX_FRAME_DT = 0.25f;
+    private static final int MAX_SUBSTEPS_PER_FRAME = 4;
     private static final float ISO_A = 0.866025f;
     private static final float ISO_B = 0.5f;
     private static final int VIEW_Y_OFFSET = 150;
@@ -54,11 +57,28 @@ public class Main {
         
         // 初始化物理核心 (你刚才新建的包含 TODO 的占位类)
         PhysicsCore physics = new PhysicsCore(data);
+        final long[] lastTickNanos = new long[]{System.nanoTime()};
+        final float[] accumulator = new float[]{0.0f};
 
         // 1. 游戏主循环 (Game Loop) - 锁定约 60 FPS (16ms)
         Timer gameLoop = new Timer(16, e -> {
-            physics.stepSimulation(0.016f); // 推进物理时间 (目前是空壳，等 AI 来写)
-            canvas.repaint();               // 触发 IsoCanvas 重新画图
+            long now = System.nanoTime();
+            float frameDt = (now - lastTickNanos[0]) * 1.0e-9f;
+            lastTickNanos[0] = now;
+            if (frameDt < 0.0f) frameDt = 0.0f;
+            if (frameDt > MAX_FRAME_DT) frameDt = MAX_FRAME_DT;
+            accumulator[0] += frameDt;
+
+            int substeps = 0;
+            while (accumulator[0] >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
+                physics.stepSimulation(FIXED_DT);
+                accumulator[0] -= FIXED_DT;
+                substeps++;
+            }
+            if (substeps == MAX_SUBSTEPS_PER_FRAME && accumulator[0] > FIXED_DT) {
+                accumulator[0] = FIXED_DT;
+            }
+            canvas.repaint(); // 触发 IsoCanvas 重新画图
         });
         gameLoop.start();
 
