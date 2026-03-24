@@ -9,6 +9,7 @@ import javax.swing.Timer;
 public class Main {
     private static final float SPAWN_HEIGHT_MIN = 400f;
     private static final float SPAWN_HEIGHT_RANGE = 400f;
+    // Explosion strength scalar used by PhysicsCore.applyExplosionImpulse.
     private static final float EXPLOSION_FORCE = 60000f;
     private static final float ISO_A = 0.866025f;
     private static final float ISO_B = 0.5f;

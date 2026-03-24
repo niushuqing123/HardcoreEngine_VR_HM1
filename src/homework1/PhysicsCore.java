@@ -14,6 +14,7 @@ public class PhysicsCore {
     private static final float EXPLOSION_RADIUS = 450.0f;
     private static final float EXPLOSION_RADIUS_SQ = EXPLOSION_RADIUS * EXPLOSION_RADIUS;
     private static final float MIN_EXPLOSION_DIST = 0.001f;
+    private static final float EXPLOSION_DISTANCE_OFFSET = 80.0f;
     private static final float EPSILON = 1e-6f;
 
     public PhysicsCore(EngineData data) {
@@ -84,7 +85,7 @@ public class PhysicsCore {
             if (linearFalloff <= 0.0f) {
                 continue;
             }
-            float deltaV = (force * linearFalloff) / (dist + 80.0f);
+            float deltaV = (force * linearFalloff) / (dist + EXPLOSION_DISTANCE_OFFSET);
             float upBoost = deltaV * 0.25f;
 
             RigidBodyPhysics.Vec3 newLinear = new RigidBodyPhysics.Vec3(
