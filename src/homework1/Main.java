@@ -54,32 +54,35 @@ public class Main {
 
     // 核心调度器：包含物理主循环和输入监听
     public static void engineStart(IsoCanvas canvas, EngineData data) {
+        final class LoopState {
+            long lastTickNanos;
+            float accumulator = 0.0f;
+        }
+        final LoopState loopState = new LoopState();
         
         // 初始化物理核心 (你刚才新建的包含 TODO 的占位类)
         PhysicsCore physics = new PhysicsCore(data);
-        final long[] lastTickNanos = new long[]{System.nanoTime()};
-        final float[] accumulator = new float[]{0.0f};
 
         // 1. 游戏主循环 (Game Loop) - 锁定约 60 FPS (16ms)
         Timer gameLoop = new Timer(16, e -> {
             long now = System.nanoTime();
-            float frameDt = (now - lastTickNanos[0]) * 1.0e-9f;
-            lastTickNanos[0] = now;
-            if (frameDt < 0.0f) frameDt = 0.0f;
-            if (frameDt > MAX_FRAME_DT) frameDt = MAX_FRAME_DT;
-            accumulator[0] += frameDt;
+            float frameDt = (now - loopState.lastTickNanos) * 1.0e-9f;
+            loopState.lastTickNanos = now;
+            frameDt = Math.min(frameDt, MAX_FRAME_DT);
+            loopState.accumulator += frameDt;
 
             int substeps = 0;
-            while (accumulator[0] >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
+            while (loopState.accumulator >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
                 physics.stepSimulation(FIXED_DT);
-                accumulator[0] -= FIXED_DT;
+                loopState.accumulator -= FIXED_DT;
                 substeps++;
             }
-            if (substeps == MAX_SUBSTEPS_PER_FRAME && accumulator[0] > FIXED_DT) {
-                accumulator[0] = FIXED_DT;
+            if (substeps == MAX_SUBSTEPS_PER_FRAME) {
+                loopState.accumulator = 0.0f;
             }
             canvas.repaint(); // 触发 IsoCanvas 重新画图
         });
+        loopState.lastTickNanos = System.nanoTime();
         gameLoop.start();
 
         // 2. 交互监听器占位 - 给云端 AI 留的外包作业
