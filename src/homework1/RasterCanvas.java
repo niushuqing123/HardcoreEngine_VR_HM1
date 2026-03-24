@@ -17,6 +17,7 @@ public class RasterCanvas extends JPanel {
     private static final float CAMERA_FOV = (float) Math.toRadians(60.0);
     private static final float CAMERA_NEAR = 0.1f;
     private static final float CAMERA_FAR = 5000.0f;
+    private static final float W_EPSILON = 1.0e-6f;
     private static final float[] BASE_CUBE_VERTICES = {
             -0.5f, -0.5f, -0.5f,
             0.5f, -0.5f, -0.5f,
@@ -103,7 +104,7 @@ public class RasterCanvas extends JPanel {
             float lz = BASE_CUBE_VERTICES[base + 2] * cubeSize;
             float[] clip = mvp.transform(lx, ly, lz, 1.0f);
             float w = clip[3];
-            if (Math.abs(w) <= 1.0e-6f) {
+            if (Math.abs(w) <= W_EPSILON) {
                 valid[v] = false;
                 continue;
             }
