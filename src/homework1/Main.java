@@ -42,8 +42,7 @@ public class Main {
         EngineData data = setup.data;
         
         // 3. 将数据层丢给渲染画布 (View 层)
-        IsoCanvas canvas = new IsoCanvas(data);
-        canvas.setMenuButtonIndices(setup.enterButtonIndex, -1);
+        RasterCanvas canvas = new RasterCanvas();
         
         // 4. 装载并显示窗口
         JFrame frame = new JFrame("Hardcore Engine v0.3 - AI Agent Ready");
@@ -58,7 +57,7 @@ public class Main {
     }
 
     // 核心调度器：包含物理主循环和输入监听
-    public static void engineStart(IsoCanvas canvas, SceneSetup setup) {
+    public static void engineStart(RasterCanvas canvas, SceneSetup setup) {
         final class LoopState {
             long lastTickNanos;
             float accumulator = 0.0f;
@@ -93,11 +92,7 @@ public class Main {
             loopState.wallCenterX = resetSetup.wallCenterX;
             loopState.wallCenterY = resetSetup.wallCenterY;
             loopState.wallCenterZ = resetSetup.wallCenterZ;
-            canvas.setData(resetSetup.data);
-            canvas.setInsideRoomMode(false);
-            canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
-            canvas.setDebugStats(loopState.engineData.count,
-                    loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
+            canvas.clearBuffers(0x1E1E1E);
             canvas.repaint();
         };
 
@@ -131,7 +126,7 @@ public class Main {
                     ? physicsFpsInstant
                     : loopState.physicsFpsSmoothed * FPS_SMOOTHING_FACTOR
                     + physicsFpsInstant * (1.0f - FPS_SMOOTHING_FACTOR);
-            canvas.setDebugStats(loopState.engineData.count, loopState.renderFpsSmoothed, loopState.physicsFpsSmoothed);
+            canvas.clearBuffers(0x1E1E1E);
             canvas.repaint(); // 触发 IsoCanvas 重新画图
         });
         loopState.lastTickNanos = System.nanoTime();
@@ -164,8 +159,6 @@ public class Main {
                         }
                         loopState.physicsCore = new PhysicsCore(loopState.engineData);
                         loopState.physicsActive = true;
-                        canvas.setInsideRoomMode(true);
-                        canvas.setMenuButtonIndices(loopState.enterButtonIndex, loopState.returnButtonIndex);
                         loopState.physicsCore.applyExplosionImpulse(
                                 loopState.wallCenterX, loopState.wallCenterY, loopState.wallCenterZ, EXPLOSION_FORCE);
                         canvas.requestFocusInWindow();
@@ -243,7 +236,7 @@ public class Main {
         return idx;
     }
 
-    private static boolean isCubeClicked(EngineData data, int cubeIndex, int mouseX, int mouseY, IsoCanvas canvas) {
+    private static boolean isCubeClicked(EngineData data, int cubeIndex, int mouseX, int mouseY, RasterCanvas canvas) {
         if (cubeIndex < 0 || cubeIndex >= data.count) {
             return false;
         }
