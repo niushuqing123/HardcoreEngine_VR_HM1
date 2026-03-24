@@ -127,7 +127,10 @@ public class Main {
                     : loopState.physicsFpsSmoothed * FPS_SMOOTHING_FACTOR
                     + physicsFpsInstant * (1.0f - FPS_SMOOTHING_FACTOR);
             canvas.clearBuffers(0x1E1E1E);
-            canvas.renderWireframes(loopState.engineData);
+            Matrix4f viewProjMatrix = canvas.getViewProjMatrix();
+            for (int i = 0; i < loopState.engineData.count; i++) {
+                canvas.drawSolidCube(loopState.engineData, i, viewProjMatrix);
+            }
             canvas.repaint(); // 触发 RasterCanvas 重新画图
         });
         loopState.lastTickNanos = System.nanoTime();
