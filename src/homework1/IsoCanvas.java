@@ -7,13 +7,38 @@ import javax.swing.JPanel;
 public class IsoCanvas extends JPanel {
     private static final float ISO_A = 0.866025f;
     private static final float ISO_B = 0.5f;
+    private static final int VIEW_Y_OFFSET = 150;
+    private static final Color BACKGROUND_TOP = new Color(0x293241);
+    private static final Color BACKGROUND_BOTTOM = new Color(0x141B24);
+    private static final Color GROUND_COLOR = new Color(0x2F5D3A);
+    private static final Color GROUND_EDGE_COLOR = new Color(0x233E2B);
+    private static final Color BOUNDS_COLOR = new Color(120, 230, 255, 150);
+    private static final Color HUD_BG = new Color(0, 0, 0, 130);
+    private static final Color HUD_TEXT = new Color(0xEAF4FF);
+    private static final float SCENE_BOUNDS_INITIAL_MAX_HEIGHT = 180.0f;
+    private static final int HUD_CORNER_RADIUS = 12;
     
     // 渲染器需要持有数据的引用
     private EngineData data;
+    private float renderFps = 0.0f;
+    private float physicsFps = 0.0f;
+    private int blockCount = 0;
     
     public IsoCanvas(EngineData data) {
         this.data = data;
+        this.blockCount = data.count;
         this.setBackground(new Color(0x1E1E1E));
+    }
+
+    public void setData(EngineData data) {
+        this.data = data;
+        this.blockCount = data.count;
+    }
+
+    public void setDebugStats(int blockCount, float renderFps, float physicsFps) {
+        this.blockCount = blockCount;
+        this.renderFps = renderFps;
+        this.physicsFps = physicsFps;
     }
 
     @Override
@@ -22,9 +47,14 @@ public class IsoCanvas extends JPanel {
         Graphics2D g2d = (Graphics2D) g;
         g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
+        drawBackground(g2d);
+ 
         // 获取窗口中心点
         int cx = getWidth() / 2;
-        int cy = getHeight() / 2 + 150; // 整体下移一点
+        int cy = getHeight() / 2 + VIEW_Y_OFFSET; // 整体下移一点
+
+        drawGround(g2d, cx, cy);
+        drawSceneBounds(g2d, cx, cy);
 
         // 核心：根据 x + z - y 做深度排序（画家算法），值小的更远，先画
         int[] order = new int[data.count];
@@ -37,15 +67,123 @@ public class IsoCanvas extends JPanel {
 
         for (int n = 0; n < data.count; n++) {
             int i = order[n];
+            drawGroundShadow(g2d, data.xPos[i], data.zPos[i], data.size[i], cx, cy);
+        }
+
+        for (int n = 0; n < data.count; n++) {
+            int i = order[n];
             drawIsoCube(g2d, data.xPos[i], data.yPos[i], data.zPos[i], data.size[i],
                     data.rotX[i], data.rotY[i], data.rotZ[i], data.colors[i], cx, cy);
         }
+
+        drawHud(g2d);
     }
 
     private int[] project(float x, float y, float z, int cx, int cy) {
         int screenX = (int) ((x - z) * ISO_A) + cx;
         int screenY = (int) ((x + z) * ISO_B - y) + cy;
         return new int[]{screenX, screenY};
+    }
+
+    private void drawBackground(Graphics2D g) {
+        GradientPaint gradient = new GradientPaint(
+                0, 0, BACKGROUND_TOP,
+                0, getHeight(), BACKGROUND_BOTTOM
+        );
+        Paint oldPaint = g.getPaint();
+        g.setPaint(gradient);
+        g.fillRect(0, 0, getWidth(), getHeight());
+        g.setPaint(oldPaint);
+    }
+
+    private void drawGround(Graphics2D g, int cx, int cy) {
+        int worldHalfExtent = 700;
+        int[] p0 = project(-worldHalfExtent, 0.0f, -worldHalfExtent, cx, cy);
+        int[] p1 = project(worldHalfExtent, 0.0f, -worldHalfExtent, cx, cy);
+        int[] p2 = project(worldHalfExtent, 0.0f, worldHalfExtent, cx, cy);
+        int[] p3 = project(-worldHalfExtent, 0.0f, worldHalfExtent, cx, cy);
+
+        int[] xs = new int[]{p0[0], p1[0], p2[0], p3[0]};
+        int[] ys = new int[]{p0[1], p1[1], p2[1], p3[1]};
+        g.setColor(GROUND_COLOR);
+        g.fillPolygon(xs, ys, 4);
+        g.setColor(GROUND_EDGE_COLOR);
+        g.drawPolygon(xs, ys, 4);
+    }
+
+    private void drawGroundShadow(Graphics2D g, float x, float z, float s, int cx, int cy) {
+        int[] center = project(x + s * 0.5f, 0.0f, z + s * 0.5f, cx, cy);
+        int shadowW = Math.max(10, (int) (s * 0.9f));
+        int shadowH = Math.max(6, (int) (s * 0.35f));
+        g.setColor(new Color(0, 0, 0, 45));
+        g.fillOval(center[0] - shadowW / 2, center[1] - shadowH / 2, shadowW, shadowH);
+    }
+
+    private void drawSceneBounds(Graphics2D g, int cx, int cy) {
+        if (data.count <= 0) {
+            return;
+        }
+        float minX = Float.MAX_VALUE;
+        float minZ = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE;
+        float maxY = SCENE_BOUNDS_INITIAL_MAX_HEIGHT;
+        float maxZ = -Float.MAX_VALUE;
+        for (int i = 0; i < data.count; i++) {
+            float x0 = data.xPos[i];
+            float y1 = data.yPos[i] + data.size[i];
+            float z0 = data.zPos[i];
+            float x1 = x0 + data.size[i];
+            float z1 = z0 + data.size[i];
+            if (x0 < minX) minX = x0;
+            if (z0 < minZ) minZ = z0;
+            if (x1 > maxX) maxX = x1;
+            if (y1 > maxY) maxY = y1;
+            if (z1 > maxZ) maxZ = z1;
+        }
+        float pad = 8.0f;
+        minX -= pad;
+        minZ -= pad;
+        maxX += pad;
+        maxZ += pad;
+        drawWireBox(g, minX, 0.0f, minZ, maxX, maxY, maxZ, cx, cy);
+    }
+
+    private void drawWireBox(Graphics2D g, float minX, float minY, float minZ,
+                             float maxX, float maxY, float maxZ, int cx, int cy) {
+        float[][] points = new float[][]{
+                {minX, minY, minZ}, {maxX, minY, minZ}, {maxX, minY, maxZ}, {minX, minY, maxZ},
+                {minX, maxY, minZ}, {maxX, maxY, minZ}, {maxX, maxY, maxZ}, {minX, maxY, maxZ}
+        };
+        int[][] p2 = new int[8][2];
+        for (int i = 0; i < 8; i++) {
+            p2[i] = project(points[i][0], points[i][1], points[i][2], cx, cy);
+        }
+        int[][] edges = new int[][]{
+                {0, 1}, {1, 2}, {2, 3}, {3, 0},
+                {4, 5}, {5, 6}, {6, 7}, {7, 4},
+                {0, 4}, {1, 5}, {2, 6}, {3, 7}
+        };
+        Stroke oldStroke = g.getStroke();
+        g.setStroke(new BasicStroke(1.6f));
+        g.setColor(BOUNDS_COLOR);
+        for (int[] edge : edges) {
+            g.drawLine(p2[edge[0]][0], p2[edge[0]][1], p2[edge[1]][0], p2[edge[1]][1]);
+        }
+        g.setStroke(oldStroke);
+    }
+
+    private void drawHud(Graphics2D g) {
+        int panelX = 16;
+        int panelY = 16;
+        int panelW = 270;
+        int panelH = 76;
+        g.setColor(HUD_BG);
+        g.fillRoundRect(panelX, panelY, panelW, panelH, HUD_CORNER_RADIUS, HUD_CORNER_RADIUS);
+        g.setColor(HUD_TEXT);
+        g.setFont(g.getFont().deriveFont(Font.BOLD, 14f));
+        g.drawString("Blocks: " + blockCount, panelX + 12, panelY + 24);
+        g.drawString(String.format("Render FPS: %.1f", renderFps), panelX + 12, panelY + 44);
+        g.drawString(String.format("Physics FPS: %.1f", physicsFps), panelX + 12, panelY + 64);
     }
 
     private void drawIsoCube(Graphics2D g, float x, float y, float z, float s,
