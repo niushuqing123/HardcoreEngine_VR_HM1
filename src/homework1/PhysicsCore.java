@@ -1,5 +1,7 @@
 package homework1;
 
+// 物理计算核心实现。
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -109,7 +111,7 @@ public class PhysicsCore {
         writeBackBodyStates();
     }
 
-    /** 外部调用：每帧驱动 kinematic 刚体到新的 Y 轴旋转角度（直接改写物理变换） */
+
     public void driveKinematicBody(int entityIdx, float yAngle, float angularSpeed) {
         if (entityIdx < 0 || entityIdx >= mappedCount) return;
         if (!data.isKinematic[entityIdx]) return;
@@ -122,13 +124,13 @@ public class PhysicsCore {
                 data.xPos[entityIdx], data.yPos[entityIdx], data.zPos[entityIdx]);
         RigidBodyPhysics.Quat rot = new RigidBodyPhysics.Quat(0.0f, sy, 0.0f, cy);
         rigidBodyPhysics.setBodyTransform(handle, pos, rot);
-        // 关键修复：设置角速度，使碰撞求解器能正确计算接触点相对速度
+
         RigidBodyPhysics.Vec3 linVel = new RigidBodyPhysics.Vec3(0.0f, 0.0f, 0.0f);
         RigidBodyPhysics.Vec3 angVel = new RigidBodyPhysics.Vec3(0.0f, angularSpeed, 0.0f);
         rigidBodyPhysics.setBodyVelocity(handle, linVel, angVel);
     }
 
-    /** 驱动绕 Z 轴旋转且沿轨道移动的 kinematic 刚体。 */
+
     public void driveKinematicBodyZ(int entityIdx,
                                     float x, float y, float z,
                                     float zAngle,
@@ -212,7 +214,7 @@ public class PhysicsCore {
 
     private void writeBackBodyStates() {
         for (int i = 0; i < mappedCount; i++) {
-            // Kinematic bodies are driven externally; skip write-back to avoid overwriting
+
             if (data.isKinematic[i]) {
                 continue;
             }
@@ -261,65 +263,30 @@ public class PhysicsCore {
     }
 }
 
-// ============================================================================
-// RigidBodyPhysics.java
-// 单文件刚体物理引擎 — Java 版（移植自 physics_null_v4.cpp）
-// ============================================================================
-//
-// 功能特性：
-//   - Box / Sphere / Capsule 碰撞体（Sphere / Capsule 近似为 AABB-aligned box）
-//   - Static / Kinematic / Dynamic 三种运动类型
-//   - OBB-OBB SAT 窄相碰撞检测（15 轴：3+3+9）
-//   - 面接触流形裁切（Sutherland-Hodgman，每对最多 4 个接触点）
-//   - 顺序脉冲速度约束求解 + 库仑摩擦（两切线轴）
-//   - 伪速度位置修正（Baumgarte）
-//   - 法线向量 warm-start（帧间缓存）
-//   - 基于速度阈值的休眠系统
-//   - 质心偏移（COM offset）与碰撞体局部姿态支持
-//
-// 用法示例：
-//   RigidBodyPhysics.Config cfg = new RigidBodyPhysics.Config();
-//   RigidBodyPhysics sim = new RigidBodyPhysics(cfg);
-//
-//   RigidBodyPhysics.BodyDesc desc = new RigidBodyPhysics.BodyDesc();
-//   desc.motionType = RigidBodyPhysics.MotionType.DYNAMIC;
-//   desc.shapeType  = RigidBodyPhysics.ShapeType.BOX;
-//   desc.boxHalfExtents = new RigidBodyPhysics.Vec3(0.5f, 0.5f, 0.5f);
-//   desc.mass = 1.0f;
-//   int handle = sim.addBody(desc);
-//
-//   sim.step(1.0f / 60.0f);
-//
-//   RigidBodyPhysics.BodyState state = sim.getBodyState(handle);
-// ============================================================================
 
 class RigidBodyPhysics {
 
-    // ========================================================================
-    // 公开 API 类型
-    // ========================================================================
 
-    /** 刚体的运动类型 */
     public enum MotionType {
-        /** 静态体：不移动，质量无限大，用于地面/墙壁 */
+
         STATIC,
-        /** 运动学体：由代码直接控制位置，不被物理力影响，但可以推动 Dynamic 体 */
+
         KINEMATIC,
-        /** 动态体：受力和碰撞响应驱动 */
+
         DYNAMIC
     }
 
-    /** 碰撞体形状类型 */
+
     public enum ShapeType {
-        /** 盒子（OBB） */
+
         BOX,
-        /** 球体（内部近似为盒子） */
+
         SPHERE,
-        /** 胶囊体（内部近似为盒子） */
+
         CAPSULE
     }
 
-    /** 三维向量 */
+
     public static final class Vec3 {
         public float x, y, z;
         public Vec3() {}
@@ -328,7 +295,7 @@ class RigidBodyPhysics {
         @Override public String toString() { return String.format("Vec3(%.4f, %.4f, %.4f)", x, y, z); }
     }
 
-    /** 单位四元数，存储顺序为 (x, y, z, w)，默认为单位旋转 */
+
     public static final class Quat {
         public float x, y, z, w;
         public Quat() { w = 1.0f; }
@@ -337,102 +304,96 @@ class RigidBodyPhysics {
         @Override public String toString() { return String.format("Quat(%.4f, %.4f, %.4f, %.4f)", x, y, z, w); }
     }
 
-    /** 创建刚体时传入的描述/配置数据 */
+
     public static final class BodyDesc {
-        /** 世界空间初始位置（Transform 原点，非质心） */
+
         public Vec3 position = new Vec3(0, 0, 0);
-        /** 世界空间初始旋转（单位四元数） */
+
         public Quat rotation = new Quat(0, 0, 0, 1);
-        /** 各轴缩放因子 */
+
         public Vec3 scale = new Vec3(1, 1, 1);
-        /** 运动类型 */
+
         public MotionType motionType = MotionType.DYNAMIC;
-        /** 碰撞体形状类型 */
+
         public ShapeType shapeType = ShapeType.BOX;
 
-        // --- 形状参数 ---
-        /** Box 碰撞体半尺寸 (hx, hy, hz) */
+
         public Vec3 boxHalfExtents = new Vec3(0.5f, 0.5f, 0.5f);
-        /** Sphere 半径 */
+
         public float sphereRadius = 0.5f;
-        /** Capsule 截面半径 */
+
         public float capsuleRadius = 0.5f;
-        /** Capsule 半高（不含端球） */
+
         public float capsuleHalfHeight = 0.5f;
 
-        // --- 物理属性 ---
-        /** 质量 (kg)，仅 Dynamic 有效 */
+
         public float mass = 1.0f;
-        /** 是否受重力影响 */
+
         public boolean useGravity = true;
-        /** 摩擦系数（0=无摩擦，1=高摩擦） */
+
         public float friction = 0.6f;
-        /** 线性速度阻尼 */
+
         public float linearDamping = 0.0f;
-        /** 角速度阻尼 */
+
         public float angularDamping = 0.0f;
 
-        // --- 质心与碰撞体局部姿态 ---
-        /** 质心相对 Transform 原点的局部偏移（body-local） */
+
         public Vec3 centerOfMassOffset = new Vec3(0, 0, 0);
-        /** 碰撞体相对 Transform 原点的局部位置偏移 */
+
         public Vec3 colliderLocalOffset = new Vec3(0, 0, 0);
-        /** 碰撞体相对刚体的局部旋转 */
+
         public Quat colliderLocalRotation = new Quat(0, 0, 0, 1);
 
-        // --- 初始速度 ---
+
         public Vec3 linearVelocity = new Vec3(0, 0, 0);
         public Vec3 angularVelocity = new Vec3(0, 0, 0);
-        /** 初始是否处于睡眠状态 */
+
         public boolean sleeping = false;
     }
 
-    /** 从物理引擎读回的刚体状态 */
+
     public static final class BodyState {
-        /** 世界空间位置（Transform 原点，非质心） */
+
         public Vec3 position;
-        /** 世界空间旋转 */
+
         public Quat rotation;
-        /** 线速度 (m/s) */
+
         public Vec3 linearVelocity;
-        /** 角速度 (rad/s) */
+
         public Vec3 angularVelocity;
-        /** 是否处于休眠状态 */
+
         public boolean sleeping;
     }
 
-    /** 接触点调试信息 */
+
     public static final class ContactInfo {
         public Vec3 point;
         public Vec3 normal;
         public float penetration;
     }
 
-    /** 刚体调试信息（AABB、质心、碰撞体中心等） */
+
     public static final class BodyDebugInfo {
-        /** 刚体句柄 */
+
         public int handle;
-        /** 质心世界坐标 */
+
         public Vec3 comWorld;
-        /** Transform 原点世界坐标 */
+
         public Vec3 transformOrigin;
-        /** 碰撞体中心世界坐标 */
+
         public Vec3 colliderCenter;
-        /** AABB 最小点 */
+
         public Vec3 aabbMin;
-        /** AABB 最大点 */
+
         public Vec3 aabbMax;
     }
 
-    /** 物理世界全局配置 */
+
     public static final class Config {
-        /** 全局重力加速度 (m/s²)，默认 Y 轴向下 */
+
         public Vec3 gravity = new Vec3(0, -9.81f, 0);
     }
 
-    // ========================================================================
-    // 私有常量
-    // ========================================================================
 
     private static final float EPS                         = 1e-6f;
     private static final float SLEEP_LIN_THRESHOLD_SQ      = 0.05f * 0.05f;
@@ -458,9 +419,6 @@ class RigidBodyPhysics {
     private static final float SAT_PREFERRED_NORMAL_BIAS   = 0.015f;
     private static final float WAKE_PENETRATION_THRESHOLD  = 0.03f;
 
-    // ========================================================================
-    // 内部数据类型
-    // ========================================================================
 
     private static final class ContactData {
         int a, b;
@@ -518,94 +476,80 @@ class RigidBodyPhysics {
         float   penetration;
     }
 
-    // ========================================================================
-    // 成员变量（SoA 模式，以句柄 handle 为索引）
-    // ========================================================================
 
     private final Config config;
 
-    // 存活标志与基本属性
+
     private int              bodyCount = 0;
     private final List<Boolean>     alive           = new ArrayList<>();
     private final List<MotionType>  motionType      = new ArrayList<>();
-    private final List<boolean[]>   solverEnabled   = new ArrayList<>();  // [0]
+    private final List<boolean[]>   solverEnabled   = new ArrayList<>();
 
-    // 运动状态（position = COM 世界坐标）
-    private final List<float[]>     position        = new ArrayList<>();  // xyz
-    private final List<float[]>     rotation        = new ArrayList<>();  // quat xyzw
-    private final List<float[]>     scale           = new ArrayList<>();  // xyz
-    private final List<float[]>     prevPosition    = new ArrayList<>();  // xyz
 
-    // 速度
-    private final List<float[]>     linearVelocity  = new ArrayList<>();  // xyz
-    private final List<float[]>     angularVelocity = new ArrayList<>();  // xyz
+    private final List<float[]>     position        = new ArrayList<>();
+    private final List<float[]>     rotation        = new ArrayList<>();
+    private final List<float[]>     scale           = new ArrayList<>();
+    private final List<float[]>     prevPosition    = new ArrayList<>();
 
-    // 质量属性
-    private final List<float[]>     mass            = new ArrayList<>();  // [0]
-    private final List<float[]>     invMass         = new ArrayList<>();  // [0]
-    private final List<float[]>     invInertiaLocal = new ArrayList<>();  // xyz 对角线
 
-    // 材质
-    private final List<float[]>     friction        = new ArrayList<>();  // [0]
-    private final List<float[]>     linearDamping   = new ArrayList<>();  // [0]
-    private final List<float[]>     angularDamping  = new ArrayList<>();  // [0]
-    private final List<boolean[]>   useGravity      = new ArrayList<>();  // [0]
+    private final List<float[]>     linearVelocity  = new ArrayList<>();
+    private final List<float[]>     angularVelocity = new ArrayList<>();
 
-    // 休眠
-    private final List<boolean[]>   sleeping        = new ArrayList<>();  // [0]
-    private final List<int[]>       sleepCounter    = new ArrayList<>();  // [0]
 
-    // 几何（碰撞体）
-    private final List<float[]>     comOffsetLocal      = new ArrayList<>(); // xyz
-    private final List<float[]>     colliderLocalOffset = new ArrayList<>(); // xyz
-    private final List<float[]>     colliderLocalRot    = new ArrayList<>(); // quat xyzw
-    private final List<float[]>     boxHalfExtLocal     = new ArrayList<>(); // xyz
-    private final List<float[]>     boxHalfExtWorld     = new ArrayList<>(); // xyz
-    private final List<float[]>     colliderCenterWorld = new ArrayList<>(); // xyz
-    private final List<float[]>     aabbMin             = new ArrayList<>(); // xyz
-    private final List<float[]>     aabbMax             = new ArrayList<>(); // xyz
-    // OBB proxy: center(0-2) + axis0(3-5) + axis1(6-8) + axis2(9-11) + halfExtents(12-14)
-    private final List<float[]>     obbProxy            = new ArrayList<>(); // float[15]
+    private final List<float[]>     mass            = new ArrayList<>();
+    private final List<float[]>     invMass         = new ArrayList<>();
+    private final List<float[]>     invInertiaLocal = new ArrayList<>();
 
-    // 力累加器
-    private final List<float[]>     forceAcc        = new ArrayList<>();  // xyz
-    private final List<float[]>     torqueAcc       = new ArrayList<>();  // xyz
 
-    // 活跃句柄列表
+    private final List<float[]>     friction        = new ArrayList<>();
+    private final List<float[]>     linearDamping   = new ArrayList<>();
+    private final List<float[]>     angularDamping  = new ArrayList<>();
+    private final List<boolean[]>   useGravity      = new ArrayList<>();
+
+
+    private final List<boolean[]>   sleeping        = new ArrayList<>();
+    private final List<int[]>       sleepCounter    = new ArrayList<>();
+
+
+    private final List<float[]>     comOffsetLocal      = new ArrayList<>();
+    private final List<float[]>     colliderLocalOffset = new ArrayList<>();
+    private final List<float[]>     colliderLocalRot    = new ArrayList<>();
+    private final List<float[]>     boxHalfExtLocal     = new ArrayList<>();
+    private final List<float[]>     boxHalfExtWorld     = new ArrayList<>();
+    private final List<float[]>     colliderCenterWorld = new ArrayList<>();
+    private final List<float[]>     aabbMin             = new ArrayList<>();
+    private final List<float[]>     aabbMax             = new ArrayList<>();
+
+    private final List<float[]>     obbProxy            = new ArrayList<>();
+
+
+    private final List<float[]>     forceAcc        = new ArrayList<>();
+    private final List<float[]>     torqueAcc       = new ArrayList<>();
+
+
     private final List<Integer>     activeHandles   = new ArrayList<>();
 
-    // 碰撞检测输出
+
     private final List<int[]>             broadphasePairs = new ArrayList<>();
     private final List<ContactData>       contacts        = new ArrayList<>();
     private final List<ManifoldData>      manifolds       = new ArrayList<>();
 
-    // Warm-start 缓存（pair key → CachedManifold）
+
     private Map<Long, CachedManifold> prevCache = new HashMap<>();
     private Map<Long, CachedManifold> nextCache = new HashMap<>();
     private float prevStepDt = 0.0f;
 
-    // ========================================================================
-    // 构造函数
-    // ========================================================================
 
     public RigidBodyPhysics(Config cfg) {
         this.config = (cfg != null) ? cfg : new Config();
     }
 
-    // ========================================================================
-    // 公开 API
-    // ========================================================================
 
-    /**
-     * 向物理世界添加一个刚体。
-     * @param desc 刚体描述/配置
-     * @return 刚体句柄（非负整数）
-     */
     public int addBody(BodyDesc desc) {
         int handle = alive.size();
 
         alive.add(true);
-        motionType.add(MotionType.STATIC);   // 由 initBodyFromDesc 更新
+        motionType.add(MotionType.STATIC);
         solverEnabled.add(new boolean[]{false});
 
         position.add(new float[3]);
@@ -649,10 +593,7 @@ class RigidBodyPhysics {
         return handle;
     }
 
-    /**
-     * 从物理世界移除一个刚体。
-     * @param handle addBody 返回的句柄
-     */
+
     public void removeBody(int handle) {
         if (!isValidHandle(handle)) return;
         alive.set(handle, false);
@@ -660,10 +601,7 @@ class RigidBodyPhysics {
         bodyCount--;
     }
 
-    /**
-     * 推进物理仿真一步。
-     * @param dt 时间步长（秒）；通常为固定步长，如 1/60
-     */
+
     public void step(float dt) {
         if (dt <= 0.0f) return;
 
@@ -672,8 +610,7 @@ class RigidBodyPhysics {
         manifolds.clear();
         nextCache.clear();
 
-        // 注意：外部调用者应在每次 step() 前通过 applyForce / applyCentralForce / applyTorque
-        // 累积本帧想要施加的力；step() 结束时 clearAccumulators() 会将其清零。
+
         integrateForces(dt);
         integrateVelocities(dt);
         autoComputeKinematicVelocities(dt);
@@ -692,11 +629,7 @@ class RigidBodyPhysics {
         prevStepDt = dt;
     }
 
-    /**
-     * 读取刚体当前状态。
-     * @param handle 刚体句柄
-     * @return 当前状态；若句柄无效则返回 null
-     */
+
     public BodyState getBodyState(int handle) {
         if (!isValidHandle(handle)) return null;
         BodyState s = new BodyState();
@@ -716,9 +649,7 @@ class RigidBodyPhysics {
         return s;
     }
 
-    /**
-     * 传送一个刚体到指定姿态（position 为 Transform 原点，非质心）。
-     */
+
     public void setBodyTransform(int handle, Vec3 worldPosition, Quat worldRotation) {
         if (!isValidHandle(handle)) return;
         float[] rot = new float[]{ worldRotation.x, worldRotation.y, worldRotation.z, worldRotation.w };
@@ -734,9 +665,7 @@ class RigidBodyPhysics {
         updateDerivedBodyState(handle);
     }
 
-    /**
-     * 直接设置刚体速度。
-     */
+
     public void setBodyVelocity(int handle, Vec3 linearVel, Vec3 angularVel) {
         if (!isValidHandle(handle)) return;
         float[] lv = linearVelocity.get(handle);
@@ -745,11 +674,7 @@ class RigidBodyPhysics {
         av[0] = angularVel.x; av[1] = angularVel.y; av[2] = angularVel.z;
     }
 
-    /**
-     * 在世界空间某点对刚体施加一个力（在下一个 step() 中生效）。
-     * @param force      世界空间力向量 (N)
-     * @param worldPoint 施力点世界坐标
-     */
+
     public void applyForce(int handle, Vec3 force, Vec3 worldPoint) {
         if (!isValidHandle(handle)) return;
         float[] fa = forceAcc.get(handle);
@@ -764,27 +689,21 @@ class RigidBodyPhysics {
         ta[2] += rx * force.y - ry * force.x;
     }
 
-    /**
-     * 对刚体施加一个中心力（通过质心，不产生力矩）。
-     */
+
     public void applyCentralForce(int handle, Vec3 force) {
         if (!isValidHandle(handle)) return;
         float[] fa = forceAcc.get(handle);
         fa[0] += force.x; fa[1] += force.y; fa[2] += force.z;
     }
 
-    /**
-     * 施加一个力矩（torque）。
-     */
+
     public void applyTorque(int handle, Vec3 torque) {
         if (!isValidHandle(handle)) return;
         float[] ta = torqueAcc.get(handle);
         ta[0] += torque.x; ta[1] += torque.y; ta[2] += torque.z;
     }
 
-    /**
-     * 唤醒一个休眠的 Dynamic 刚体。
-     */
+
     public void wakeBody(int handle) {
         if (!isValidHandle(handle)) return;
         if (motionType.get(handle) == MotionType.DYNAMIC) {
@@ -793,23 +712,23 @@ class RigidBodyPhysics {
         }
     }
 
-    /** 获取活跃刚体总数 */
+
     public int getBodyCount() { return bodyCount; }
 
-    /** 获取休眠刚体数量 */
+
     public int getSleepingCount() {
         int cnt = 0;
         for (int h : activeHandles) if (sleeping.get(h)[0]) cnt++;
         return cnt;
     }
 
-    /** 获取上一步生成的接触点数量 */
+
     public int getContactCount() { return contacts.size(); }
 
-    /** 获取上一步的宽相碰撞对数量 */
+
     public int getBroadphasePairCount() { return broadphasePairs.size(); }
 
-    /** 获取上一步所有接触点的调试信息 */
+
     public List<ContactInfo> getContacts() {
         List<ContactInfo> result = new ArrayList<>(contacts.size());
         for (ContactData c : contacts) {
@@ -822,7 +741,7 @@ class RigidBodyPhysics {
         return result;
     }
 
-    /** 获取所有活跃刚体的调试几何信息（AABB、质心等） */
+
     public List<BodyDebugInfo> getBodyDebugInfos() {
         List<BodyDebugInfo> result = new ArrayList<>(activeHandles.size());
         for (int h : activeHandles) {
@@ -846,9 +765,6 @@ class RigidBodyPhysics {
         return result;
     }
 
-    // ========================================================================
-    // 私有：刚体初始化
-    // ========================================================================
 
     private void initBodyFromDesc(int h, BodyDesc d) {
         motionType.set(h, d.motionType);
@@ -866,7 +782,7 @@ class RigidBodyPhysics {
         clr[0] = d.colliderLocalRotation.x; clr[1] = d.colliderLocalRotation.y;
         clr[2] = d.colliderLocalRotation.z; clr[3] = d.colliderLocalRotation.w;
 
-        // Box half extents（Sphere/Capsule 近似为 box）
+
         float[] bhe = boxHalfExtLocal.get(h);
         boolean enabled = true;
         switch (d.shapeType) {
@@ -885,28 +801,28 @@ class RigidBodyPhysics {
         }
         solverEnabled.get(h)[0] = enabled;
 
-        // 材质
+
         friction.get(h)[0]       = d.friction;
         linearDamping.get(h)[0]  = d.linearDamping;
         angularDamping.get(h)[0] = d.angularDamping;
         useGravity.get(h)[0]     = d.useGravity;
 
-        // 质量（仅 Dynamic 有效）
+
         float effectiveMass = (d.motionType == MotionType.DYNAMIC) ? d.mass : 0.0f;
         if (effectiveMass <= EPS) effectiveMass = 0.0f;
         mass.get(h)[0]    = effectiveMass;
         invMass.get(h)[0] = (effectiveMass > EPS) ? 1.0f / effectiveMass : 0.0f;
 
-        // 世界空间 half extents（应用缩放）
+
         float[] whe = boxHalfExtWorld.get(h);
         whe[0] = Math.abs(bhe[0] * sc[0]);
         whe[1] = Math.abs(bhe[1] * sc[1]);
         whe[2] = Math.abs(bhe[2] * sc[2]);
 
-        // 惯性张量
+
         computeBoxInvInertiaDiag(effectiveMass, whe, invInertiaLocal.get(h));
 
-        // 初始变换（将 Transform 原点转为 COM 世界坐标）
+
         float[] rot = rotation.get(h);
         rot[0] = d.rotation.x; rot[1] = d.rotation.y; rot[2] = d.rotation.z; rot[3] = d.rotation.w;
         normalizeQuatInPlace(rot);
@@ -917,13 +833,13 @@ class RigidBodyPhysics {
         pos[0] = comWorld[0]; pos[1] = comWorld[1]; pos[2] = comWorld[2];
         System.arraycopy(pos, 0, prevPosition.get(h), 0, 3);
 
-        // 初始速度
+
         float[] lv = linearVelocity.get(h);
         lv[0] = d.linearVelocity.x; lv[1] = d.linearVelocity.y; lv[2] = d.linearVelocity.z;
         float[] av = angularVelocity.get(h);
         av[0] = d.angularVelocity.x; av[1] = d.angularVelocity.y; av[2] = d.angularVelocity.z;
 
-        // 休眠
+
         sleeping.get(h)[0]     = d.sleeping;
         sleepCounter.get(h)[0] = 0;
     }
@@ -932,9 +848,6 @@ class RigidBodyPhysics {
         return h >= 0 && h < alive.size() && alive.get(h);
     }
 
-    // ========================================================================
-    // 数学工具函数（静态）
-    // ========================================================================
 
     private static float dot(float[] a, float[] b) {
         return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -964,10 +877,7 @@ class RigidBodyPhysics {
         q[0] *= inv; q[1] *= inv; q[2] *= inv; q[3] *= inv;
     }
 
-    /**
-     * 用四元数旋转向量 v。
-     * 使用高效公式：t = 2*(q_vec × v); v' = v + qw*t + q_vec × t
-     */
+
     private static float[] rotateByQuat(float[] q, float[] v) {
         float qx = q[0], qy = q[1], qz = q[2], qw = q[3];
         float vx = v[0], vy = v[1], vz = v[2];
@@ -981,7 +891,7 @@ class RigidBodyPhysics {
         };
     }
 
-    /** 四元数乘法（Hamilton 积）：a * b */
+
     private static float[] quatMul(float[] a, float[] b) {
         return new float[]{
             a[3]*b[0] + a[0]*b[3] + a[1]*b[2] - a[2]*b[1],
@@ -1014,9 +924,9 @@ class RigidBodyPhysics {
         return Math.max(lo, Math.min(v, hi));
     }
 
-    /** 一阶欧拉旋转积分：q_new = normalize(q + 0.5 * omega * q * dt) */
+
     private static float[] integrateRotationEuler(float[] q, float[] angVel, float dt) {
-        // omega 作为纯四元数: {wx, wy, wz, 0}
+
         float[] omega = { angVel[0], angVel[1], angVel[2], 0 };
         float[] dq = quatMul(omega, q);
         float[] out = {
@@ -1029,7 +939,7 @@ class RigidBodyPhysics {
         return out;
     }
 
-    /** 将增量角度应用到四元数（限幅防止过大跳变） */
+
     private static float[] applyRotationDelta(float[] q, float[] deltaAngle) {
         float lenSq = lengthSq(deltaAngle);
         if (lenSq <= EPS * EPS) return q.clone();
@@ -1042,11 +952,7 @@ class RigidBodyPhysics {
         return integrateRotationEuler(q, da, 1.0f);
     }
 
-    // ========================================================================
-    // 物理辅助函数
-    // ========================================================================
 
-    /** 计算长方体逆惯性张量对角线（主轴坐标系） */
     private static void computeBoxInvInertiaDiag(float m, float[] he, float[] out) {
         if (m <= EPS) { out[0] = 0; out[1] = 0; out[2] = 0; return; }
         float sx = 2 * he[0], sy = 2 * he[1], sz = 2 * he[2];
@@ -1058,17 +964,17 @@ class RigidBodyPhysics {
         out[2] = (iz > EPS) ? 1.0f / iz : 0.0f;
     }
 
-    /** Transform 原点 → COM 世界坐标：p_com = p_transform + rotate(rot, com_offset) */
+
     private static float[] worldTransformToBodyPosition(float[] tPos, float[] rot, float[] comOffset) {
         return add3(tPos, rotateByQuat(rot, comOffset));
     }
 
-    /** COM 世界坐标 → Transform 原点：p_transform = p_com - rotate(rot, com_offset) */
+
     private static float[] bodyPositionToWorldTransform(float[] bodyPos, float[] rot, float[] comOffset) {
         return sub3(bodyPos, rotateByQuat(rot, comOffset));
     }
 
-    /** 将向量 value 乘以刚体 h 的世界空间逆惯性张量 */
+
     private float[] applyInvInertiaWorld(int h, float[] value) {
         float[] rot = rotation.get(h);
         float[] clr = colliderLocalRot.get(h);
@@ -1087,15 +993,12 @@ class RigidBodyPhysics {
         };
     }
 
-    /** 计算刚体 h 在世界空间点 r（相对于 COM）处的点速度 */
+
     private float[] computePointVelocity(int h, float[] r) {
         return add3(linearVelocity.get(h), cross(angularVelocity.get(h), r));
     }
 
-    /**
-     * 计算某约束轴的等效质量（1 自由度）。
-     * 同一公式可复用于法线约束、摩擦约束，未来还可复用于关节约束。
-     */
+
     private float computeConstraintEffMass(int a, int b, float[] r1, float[] r2, float[] axis) {
         float k = invMass.get(a)[0] + invMass.get(b)[0];
         if (invMass.get(a)[0] > 0) {
@@ -1109,7 +1012,7 @@ class RigidBodyPhysics {
         return (k > EPS) ? 1.0f / k : 0.0f;
     }
 
-    /** 对 a、b 两体施加速度冲量对 */
+
     private void applyImpulsePair(int a, int b, float[] impulse, float[] r1, float[] r2) {
         float im_a = invMass.get(a)[0], im_b = invMass.get(b)[0];
         if (im_a > 0) {
@@ -1122,7 +1025,7 @@ class RigidBodyPhysics {
         }
     }
 
-    /** 对 a、b 两体施加位置修正冲量对（影响 position/rotation，不影响速度） */
+
     private void applyPositionImpulsePair(int a, int b, float[] impulse, float[] r1, float[] r2) {
         float im_a = invMass.get(a)[0], im_b = invMass.get(b)[0];
         if (im_a > 0) {
@@ -1139,11 +1042,7 @@ class RigidBodyPhysics {
         }
     }
 
-    // ========================================================================
-    // OBB Proxy 与 AABB 维护
-    // ========================================================================
 
-    // OBB proxy float[15] 布局: center(0-2), axis0(3-5), axis1(6-8), axis2(9-11), halfExtents(12-14)
     private static float[] obbCenter(float[] obb) { return new float[]{ obb[0], obb[1], obb[2] }; }
     private static float[] obbAxis(float[] obb, int i) {
         return new float[]{ obb[3+i*3], obb[3+i*3+1], obb[3+i*3+2] };
@@ -1183,7 +1082,7 @@ class RigidBodyPhysics {
         float[] collWorldRot = quatMul(rot, clr);
         buildObbProxy(obbProxy.get(h), cc, collWorldRot, whe);
 
-        // AABB from OBB
+
         float[] obb = obbProxy.get(h);
         float hx = 0, hy = 0, hz = 0;
         for (int i = 0; i < 3; i++) {
@@ -1202,9 +1101,6 @@ class RigidBodyPhysics {
         for (int h : activeHandles) updateDerivedBodyState(h);
     }
 
-    // ========================================================================
-    // 物理步骤
-    // ========================================================================
 
     private boolean isTrulyDynamic(int h) {
         return motionType.get(h) == MotionType.DYNAMIC && invMass.get(h)[0] > 0;
@@ -1254,10 +1150,7 @@ class RigidBodyPhysics {
         }
     }
 
-    /**
-     * 自动推算 Kinematic 刚体的线速度（从帧间位移推算）。
-     * 角速度需由外部通过 setBodyVelocity() 显式设置，因为从四元数差分推算精度不稳定。
-     */
+
     private void autoComputeKinematicVelocities(float dt) {
         if (dt <= EPS) return;
         float invDt = 1.0f / dt;
@@ -1298,14 +1191,7 @@ class RigidBodyPhysics {
         }
     }
 
-    // ========================================================================
-    // SAT 碰撞检测（OBB vs OBB）
-    // ========================================================================
 
-    /**
-     * OBB-OBB SAT 检测（15 轴：3 个 A 面法线 + 3 个 B 面法线 + 9 个边叉积轴）。
-     * preferredNormal 为上一帧缓存的法线，用于轻量级 SAT 迟滞抑制轴抖动。
-     */
     private SatResult boxBoxSat(float[] obbA, float[] obbB, float[] preferredNormal) {
         SatResult result = new SatResult();
         result.separated  = false;
@@ -1371,7 +1257,7 @@ class RigidBodyPhysics {
         return result;
     }
 
-    /** 重新测量给定法线方向上的穿透深度（用于位置修正时重新取样） */
+
     private static float remeasurePenetration(float[] obbA, float[] obbB, float[] normal) {
         float ra = 0, rb = 0;
         for (int i = 0; i < 3; i++) {
@@ -1382,7 +1268,7 @@ class RigidBodyPhysics {
         return ra + rb - dist;
     }
 
-    /** 在给定方向上的 OBB 支撑点 */
+
     private static float[] obbSupport(float[] obb, float[] dir) {
         float[] res = obbCenter(obb).clone();
         for (int i = 0; i < 3; i++) {
@@ -1396,15 +1282,7 @@ class RigidBodyPhysics {
         return res;
     }
 
-    // ========================================================================
-    // 面接触流形裁切
-    // ========================================================================
 
-    /**
-     * 构造 OBB 某面的四个顶点（CCW 方向，从外侧看）。
-     * outCN[0] = faceCenter, outCN[1] = faceNormal
-     * outVertices[0..3] = 四顶点
-     */
     private static void buildFaceVertices(float[] obb, int faceAxis, float faceSign,
                                            float[][] outCN, float[][] outVerts) {
         float[] axFace = obbAxis(obb, faceAxis);
@@ -1422,7 +1300,7 @@ class RigidBodyPhysics {
         outVerts[2] = sub3(sub3(center, u), v);
         outVerts[3] = add3(add3(center, u), scale3(v, -1));
 
-        // 确保 CCW 绕序与法线一致
+
         float[] winding = cross(sub3(outVerts[1], outVerts[0]), sub3(outVerts[2], outVerts[1]));
         if (dot(winding, normal) < 0) {
             float[] tmp = outVerts[1]; outVerts[1] = outVerts[3]; outVerts[3] = tmp;
@@ -1431,7 +1309,7 @@ class RigidBodyPhysics {
         outCN[1] = normal;
     }
 
-    /** 从 OBB 中选出与 direction 最对齐的面 */
+
     private static void buildMostAlignedFace(float[] obb, float[] direction,
                                               float[][] outCN, float[][] outVerts) {
         int bestAxis = 0;
@@ -1445,7 +1323,7 @@ class RigidBodyPhysics {
         buildFaceVertices(obb, bestAxis, (bestDot >= 0) ? 1.0f : -1.0f, outCN, outVerts);
     }
 
-    /** Sutherland-Hodgman 多边形裁切：保留在平面正侧的顶点 */
+
     private static List<float[]> clipPolygonAgainstPlane(List<float[]> input,
                                                           float[] planePoint,
                                                           float[] planeNormal) {
@@ -1487,10 +1365,7 @@ class RigidBodyPhysics {
         cands.addAll(unique);
     }
 
-    /**
-     * 将接触候选点剪枝到最多 4 个，优先保留覆盖面积最大的四边形。
-     * 算法：贪心选取最远点组合（深度加权）。
-     */
+
     private static List<ContactCandidate> pruneCandidates(List<ContactCandidate> input, float[] normal) {
         int sz = input.size();
         if (sz <= 4) return new ArrayList<>(input);
@@ -1505,7 +1380,7 @@ class RigidBodyPhysics {
         }
         centroid[0] /= sz; centroid[1] /= sz; centroid[2] /= sz;
 
-        // 1. 距质心最远
+
         int first = 0; float firstScore = -1;
         for (int i = 0; i < sz; i++) {
             float s = lengthSq(sub3(projected[i], centroid))
@@ -1515,7 +1390,7 @@ class RigidBodyPhysics {
         List<Integer> chosen = new ArrayList<>();
         chosen.add(first);
 
-        // 2. 距第一点最远
+
         int second = first; float secondScore = -1;
         for (int i = 0; i < sz; i++) {
             float s = lengthSq(sub3(projected[i], projected[first]))
@@ -1529,7 +1404,7 @@ class RigidBodyPhysics {
         else edgeDir = normalizeVec3(edgeDir);
         float[] perp = normalizeVec3(cross(normal, edgeDir));
 
-        // 3. 垂直方向两侧最远点
+
         int posIdx = -1, negIdx = -1;
         float posD = -1, negD = -1;
         for (int i = 0; i < sz; i++) {
@@ -1551,7 +1426,7 @@ class RigidBodyPhysics {
             }
             if (!dup) output.add(c);
         }
-        // 补满 4 个
+
         outer:
         while (output.size() < 4) {
             for (ContactCandidate c : input) {
@@ -1569,7 +1444,7 @@ class RigidBodyPhysics {
         return output;
     }
 
-    /** 面-面接触：用 Sutherland-Hodgman 裁切 incident face，投影到 reference plane */
+
     private static List<ContactCandidate> buildFaceManifoldCandidates(float[] obbA, float[] obbB,
                                                                         SatResult sat) {
         List<ContactCandidate> contacts = new ArrayList<>();
@@ -1625,7 +1500,7 @@ class RigidBodyPhysics {
         return contacts;
     }
 
-    /** 边-边接触：计算两段边的最近点 */
+
     private static ContactCandidate buildEdgeEdgeCandidate(float[] obbA, float[] obbB, SatResult sat) {
         float[] d = sub3(obbCenter(obbB), obbCenter(obbA));
         int ea = sat.edgeA, eb = sat.edgeB;
@@ -1667,15 +1542,12 @@ class RigidBodyPhysics {
         return cc;
     }
 
-    // ========================================================================
-    // 接触点初始化与 Warm Start
-    // ========================================================================
 
     private void initializeContact(ContactData c, float dt) {
         c.r1 = sub3(c.point, position.get(c.a));
         c.r2 = sub3(c.point, position.get(c.b));
 
-        // 切线基
+
         float[] hint = (Math.abs(c.normal[0]) < 0.57f) ? new float[]{ 1, 0, 0 } : new float[]{ 0, 1, 0 };
         c.tangent1 = normalizeVec3(cross(c.normal, hint));
         if (lengthSq(c.tangent1) <= EPS * EPS)
@@ -1710,7 +1582,7 @@ class RigidBodyPhysics {
         return (hi << 32L) | (lo & 0xFFFFFFFFL);
     }
 
-    /** 尝试从上一帧缓存中为接触点 c 注入 warm-start 冲量 */
+
     private boolean seedWarmStart(long pairKey, float ratio, boolean[] usedMask, ContactData c) {
         CachedManifold cached = prevCache.get(pairKey);
         if (cached == null || cached.count == 0) return false;
@@ -1726,9 +1598,8 @@ class RigidBodyPhysics {
 
         usedMask[best]  = true;
         c.normalLambda  = Math.max(0, cached.points[best].normalLambda * ratio);
-        // 仅热启动法线冲量，切线方向归零。
-        // 与 C++ v4 设计一致：法线热启动修复了金字塔坍塌问题，
-        // 同时避免帧间切线方向抖动导致的不稳定。
+
+
         c.t1Lambda      = 0;
         c.t2Lambda      = 0;
 
@@ -1833,21 +1704,14 @@ class RigidBodyPhysics {
         }
     }
 
-    // ========================================================================
-    // 约束求解
-    // ========================================================================
 
-    /**
-     * 顺序脉冲速度约束求解（摩擦优先，法线靠后）。
-     * 每次迭代依次处理两个切线轴（Coulomb 圆锥裁切），再处理法线轴。
-     */
     private void solveVelocityConstraints() {
         for (ContactData c : contacts) {
             float[] va = computePointVelocity(c.a, c.r1);
             float[] vb = computePointVelocity(c.b, c.r2);
             float[] rv = sub3(vb, va);
 
-            // --- 摩擦 ---
+
             float jt1 = -dot(rv, c.tangent1) * c.t1EffMass;
             float jt2 = -dot(rv, c.tangent2) * c.t2EffMass;
             float oldT1 = c.t1Lambda, oldT2 = c.t2Lambda;
@@ -1865,7 +1729,7 @@ class RigidBodyPhysics {
             float[] tImpulse = add3(scale3(c.tangent1, apT1), scale3(c.tangent2, apT2));
             if (lengthSq(tImpulse) > 0) applyImpulsePair(c.a, c.b, tImpulse, c.r1, c.r2);
 
-            // --- 法线 ---
+
             float[] vaAfter   = computePointVelocity(c.a, c.r1);
             float[] vbAfter   = computePointVelocity(c.b, c.r2);
             float normalSpeed = dot(sub3(vbAfter, vaAfter), c.normal);
@@ -1878,9 +1742,7 @@ class RigidBodyPhysics {
         }
     }
 
-    /**
-     * 伪速度位置修正（Baumgarte，每次迭代重新测量穿透深度）。
-     */
+
     private void solvePositionConstraints() {
         for (ManifoldData manifold : manifolds) {
             int a = manifold.a, b = manifold.b;
@@ -1950,9 +1812,6 @@ class RigidBodyPhysics {
         }
     }
 
-    // ========================================================================
-    // 简单的自测入口（可直接 java RigidBodyPhysics 运行）
-    // ========================================================================
 
     public static void main(String[] args) {
         System.out.println("=== RigidBodyPhysics self-test ===");
@@ -1960,7 +1819,7 @@ class RigidBodyPhysics {
         Config cfg = new Config();
         RigidBodyPhysics sim = new RigidBodyPhysics(cfg);
 
-        // 地面（Static Box）
+
         BodyDesc ground = new BodyDesc();
         ground.motionType   = MotionType.STATIC;
         ground.shapeType    = ShapeType.BOX;
@@ -1970,7 +1829,7 @@ class RigidBodyPhysics {
         ground.friction     = 0.5f;
         sim.addBody(ground);
 
-        // 动态盒子（从高处落下）
+
         BodyDesc box = new BodyDesc();
         box.motionType    = MotionType.DYNAMIC;
         box.shapeType     = ShapeType.BOX;
@@ -1982,7 +1841,7 @@ class RigidBodyPhysics {
 
         System.out.printf("Initial box Y = %.4f%n", sim.getBodyState(boxHandle).position.y);
 
-        // 模拟 3 秒 @ 60 Hz
+
         float dt = 1.0f / 60.0f;
         for (int tick = 0; tick < 180; tick++) {
             sim.step(dt);

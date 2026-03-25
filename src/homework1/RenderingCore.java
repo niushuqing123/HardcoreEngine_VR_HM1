@@ -1,5 +1,7 @@
 package homework1;
 
+// 光栅渲染核心实现。
+
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -10,10 +12,10 @@ import javax.swing.JPanel;
 
 @SuppressWarnings("serial")
 class RasterCanvas extends JPanel {
-    // 渲染分辨率改为正方形
+
     public static final int RENDER_W = 640;
     public static final int RENDER_H = 640;
-    // 调相机看这里：Y 更负表示相机更高，Z 越接近 0 表示相机越往前。
+
     public static final float CAMERA_Y = -210.0f;
     public static final float CAMERA_Z = -740.0f;
     public static final float CAMERA_FOV = (float) Math.toRadians(60.0);
@@ -155,14 +157,14 @@ class RasterCanvas extends JPanel {
         int color = data.colors[index];
         int rings = 8;
         int sectors = 8;
-        
+
         for (int r = 0; r < rings; r++) {
             float phi1 = (float) (Math.PI * r / rings);
             float phi2 = (float) (Math.PI * (r + 1) / rings);
             for (int s = 0; s < sectors; s++) {
                 float theta1 = (float) (2.0 * Math.PI * s / sectors);
                 float theta2 = (float) (2.0 * Math.PI * (s + 1) / sectors);
-                
+
                 float[][] v = new float[4][3];
                 v[0] = getSpherePoint(phi1, theta1, radius, mvp);
                 v[1] = getSpherePoint(phi1, theta2, radius, mvp);
