@@ -254,7 +254,19 @@ public class Main {
                     && (now - loopState.lastReturnButtonSwapNanos) >= 2_000_000_000L) {
                 // 恢复旧率色
                 loopState.engineData.colors[loopState.returnButtonIndex] = loopState.returnButtonOriginalColor;
-                int newReturnIdx = pickReturnButtonIndex(loopState.engineData, loopState.enterButtonIndex, loopState.random);
+                int newReturnIdx = -1;
+                if (loopState.engineData.count > 1) {
+                    int maxAttempts = 50;
+                    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+                        int candidate = loopState.random.nextInt(loopState.engineData.count);
+                        if (candidate != loopState.enterButtonIndex
+                                && !loopState.engineData.isStatic[candidate]
+                                && !loopState.engineData.isKinematic[candidate]) {
+                            newReturnIdx = candidate;
+                            break;
+                        }
+                    }
+                }
                 if (newReturnIdx >= 0) {
                     loopState.returnButtonOriginalColor = loopState.engineData.colors[newReturnIdx];
                     loopState.returnButtonIndex = newReturnIdx;
@@ -294,8 +306,19 @@ public class Main {
 
                 if (loopState.returnButtonIndex < 0) {
                     if (isCubeClicked(loopState.engineData, loopState.enterButtonIndex, mouseX, mouseY, canvas)) {
-                        int newIdx = pickReturnButtonIndex(
-                                loopState.engineData, loopState.enterButtonIndex, loopState.random);
+                        int newIdx = -1;
+                        if (loopState.engineData.count > 1) {
+                            int maxAttempts = 50;
+                            for (int attempt = 0; attempt < maxAttempts; attempt++) {
+                                int candidate = loopState.random.nextInt(loopState.engineData.count);
+                                if (candidate != loopState.enterButtonIndex
+                                        && !loopState.engineData.isStatic[candidate]
+                                        && !loopState.engineData.isKinematic[candidate]) {
+                                    newIdx = candidate;
+                                    break;
+                                }
+                            }
+                        }
                         if (newIdx >= 0) {
                             // 保存旧颜色再涂绿
                             loopState.returnButtonOriginalColor = loopState.engineData.colors[newIdx];
@@ -330,9 +353,18 @@ public class Main {
                 }
 
                 if (loopState.physicsActive && loopState.physicsCore != null) {
-                    float[] impactPoint = screenToWorldOnPlane(canvas, mouseX, mouseY, loopState.wallImpactZ);
+                    float ndcX = (mouseX / (float) canvas.getWidth()) * 2.0f - 1.0f;
+                    float ndcY = 1.0f - (mouseY / (float) canvas.getHeight()) * 2.0f;
+                    float aspect = (float) RasterCanvas.RENDER_W / (float) RasterCanvas.RENDER_H;
+                    float focalLength = 1.0f / (float) Math.tan(RasterCanvas.CAMERA_FOV * 0.5f);
+                    float viewZ = loopState.wallImpactZ + RasterCanvas.CAMERA_Z;
+                    float viewX = ndcX * (-viewZ) * aspect / focalLength;
+                    float viewY = ndcY * (-viewZ) / focalLength;
                     loopState.physicsCore.applyExplosionImpulse(
-                            impactPoint[0], impactPoint[1], impactPoint[2], EXPLOSION_FORCE * 0.5f);
+                            viewX,
+                            viewY - RasterCanvas.CAMERA_Y,
+                            loopState.wallImpactZ,
+                            EXPLOSION_FORCE * 0.5f);
                 }
                 canvas.requestFocusInWindow();
             }
@@ -476,20 +508,6 @@ public class Main {
         }
     }
 
-    private static int pickReturnButtonIndex(EngineData data, int enterButtonIndex, Random random) {
-        if (data.count <= 1) {
-            return -1;
-        }
-        int maxAttempts = 50;
-        for (int i = 0; i < maxAttempts; i++) {
-            int idx = random.nextInt(data.count);
-            if (idx != enterButtonIndex && !data.isStatic[idx] && !data.isKinematic[idx]) {
-                return idx;
-            }
-        }
-        return -1;
-    }
-
     private static boolean isCubeClicked(EngineData data, int cubeIndex, int mouseX, int mouseY, RasterCanvas canvas) {
         if (cubeIndex < 0 || cubeIndex >= data.count) {
             return false;
@@ -567,14 +585,4 @@ public class Main {
                 && mouseY <= maxY + BUTTON_HIT_PADDING;
     }
 
-    private static float[] screenToWorldOnPlane(RasterCanvas canvas, int mouseX, int mouseY, float planeZ) {
-        float ndcX = (mouseX / (float) canvas.getWidth()) * 2.0f - 1.0f;
-        float ndcY = 1.0f - (mouseY / (float) canvas.getHeight()) * 2.0f;
-        float aspect = (float) RasterCanvas.RENDER_W / (float) RasterCanvas.RENDER_H;
-        float focalLength = 1.0f / (float) Math.tan(RasterCanvas.CAMERA_FOV * 0.5f);
-        float viewZ = planeZ + RasterCanvas.CAMERA_Z;
-        float viewX = ndcX * (-viewZ) * aspect / focalLength;
-        float viewY = ndcY * (-viewZ) / focalLength;
-        return new float[]{viewX, viewY - RasterCanvas.CAMERA_Y, planeZ};
-    }
 }
