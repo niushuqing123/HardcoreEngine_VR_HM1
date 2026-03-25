@@ -92,21 +92,6 @@ class RasterCanvas extends JPanel {
         }
     }
 
-    private static float edgeFunction(float ax, float ay, float bx, float by, float px, float py) {
-        return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
-    }
-
-    private static int shadeFaceColor(int baseColor, int faceIndex) {
-        float shade = 1.0f - Math.min(faceIndex, MAX_FACE_SHADE_INDEX) * FACE_SHADE_STEP;
-        int r = (baseColor >> 16) & 0xFF;
-        int g = (baseColor >> 8) & 0xFF;
-        int b = baseColor & 0xFF;
-        int rr = Math.max(0, Math.min(255, Math.round(r * shade)));
-        int gg = Math.max(0, Math.min(255, Math.round(g * shade)));
-        int bb = Math.max(0, Math.min(255, Math.round(b * shade)));
-        return (rr << 16) | (gg << 8) | bb;
-    }
-
     private void drawTriangle(float[] v0, float[] v1, float[] v2, int color) {
         int minX = Math.max(0, (int) Math.floor(Math.min(v0[0], Math.min(v1[0], v2[0]))) - 1);
         int maxX = Math.min(RENDER_W - 1, (int) Math.ceil(Math.max(v0[0], Math.max(v1[0], v2[0]))) + 1);
@@ -116,7 +101,7 @@ class RasterCanvas extends JPanel {
             return;
         }
 
-        float area = edgeFunction(v0[0], v0[1], v1[0], v1[1], v2[0], v2[1]);
+        float area = (v2[0] - v0[0]) * (v1[1] - v0[1]) - (v2[1] - v0[1]) * (v1[0] - v0[0]);
         if (Math.abs(area) <= W_EPSILON) {
             return;
         }
@@ -126,9 +111,9 @@ class RasterCanvas extends JPanel {
             float py = y + 0.5f;
             for (int x = minX; x <= maxX; x++) {
                 float px = x + 0.5f;
-                float w0 = edgeFunction(v1[0], v1[1], v2[0], v2[1], px, py);
-                float w1 = edgeFunction(v2[0], v2[1], v0[0], v0[1], px, py);
-                float w2 = edgeFunction(v0[0], v0[1], v1[0], v1[1], px, py);
+                float w0 = (px - v1[0]) * (v2[1] - v1[1]) - (py - v1[1]) * (v2[0] - v1[0]);
+                float w1 = (px - v2[0]) * (v0[1] - v2[1]) - (py - v2[1]) * (v0[0] - v2[0]);
+                float w2 = (px - v0[0]) * (v1[1] - v0[1]) - (py - v0[1]) * (v1[0] - v0[0]);
                 boolean inside = areaPositive
                         ? (w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f)
                         : (w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f);
@@ -166,33 +151,79 @@ class RasterCanvas extends JPanel {
                 float theta2 = (float) (2.0 * Math.PI * (s + 1) / sectors);
 
                 float[][] v = new float[4][3];
-                v[0] = getSpherePoint(phi1, theta1, radius, mvp);
-                v[1] = getSpherePoint(phi1, theta2, radius, mvp);
-                v[2] = getSpherePoint(phi2, theta2, radius, mvp);
-                v[3] = getSpherePoint(phi2, theta1, radius, mvp);
+                float x0 = (float) (radius * Math.sin(phi1) * Math.cos(theta1));
+                float y0 = (float) (radius * Math.cos(phi1));
+                float z0 = (float) (radius * Math.sin(phi1) * Math.sin(theta1));
+                float[] clip0 = mvp.transform(x0, y0, z0, 1.0f);
+                if (Math.abs(clip0[3]) > W_EPSILON) {
+                    float invW0 = 1.0f / clip0[3];
+                    float ndcX0 = clip0[0] * invW0;
+                    float ndcY0 = clip0[1] * invW0;
+                    float ndcZ0 = clip0[2] * invW0;
+                    if (ndcZ0 >= -1.0f && ndcZ0 <= 1.0f) {
+                        v[0] = new float[]{
+                            (ndcX0 * 0.5f + 0.5f) * (RENDER_W - 1),
+                            (1.0f - (ndcY0 * 0.5f + 0.5f)) * (RENDER_H - 1),
+                            ndcZ0
+                        };
+                    }
+                }
+                float x1 = (float) (radius * Math.sin(phi1) * Math.cos(theta2));
+                float y1 = (float) (radius * Math.cos(phi1));
+                float z1 = (float) (radius * Math.sin(phi1) * Math.sin(theta2));
+                float[] clip1 = mvp.transform(x1, y1, z1, 1.0f);
+                if (Math.abs(clip1[3]) > W_EPSILON) {
+                    float invW1 = 1.0f / clip1[3];
+                    float ndcX1 = clip1[0] * invW1;
+                    float ndcY1 = clip1[1] * invW1;
+                    float ndcZ1 = clip1[2] * invW1;
+                    if (ndcZ1 >= -1.0f && ndcZ1 <= 1.0f) {
+                        v[1] = new float[]{
+                            (ndcX1 * 0.5f + 0.5f) * (RENDER_W - 1),
+                            (1.0f - (ndcY1 * 0.5f + 0.5f)) * (RENDER_H - 1),
+                            ndcZ1
+                        };
+                    }
+                }
+                float x2 = (float) (radius * Math.sin(phi2) * Math.cos(theta2));
+                float y2 = (float) (radius * Math.cos(phi2));
+                float z2 = (float) (radius * Math.sin(phi2) * Math.sin(theta2));
+                float[] clip2 = mvp.transform(x2, y2, z2, 1.0f);
+                if (Math.abs(clip2[3]) > W_EPSILON) {
+                    float invW2 = 1.0f / clip2[3];
+                    float ndcX2 = clip2[0] * invW2;
+                    float ndcY2 = clip2[1] * invW2;
+                    float ndcZ2 = clip2[2] * invW2;
+                    if (ndcZ2 >= -1.0f && ndcZ2 <= 1.0f) {
+                        v[2] = new float[]{
+                            (ndcX2 * 0.5f + 0.5f) * (RENDER_W - 1),
+                            (1.0f - (ndcY2 * 0.5f + 0.5f)) * (RENDER_H - 1),
+                            ndcZ2
+                        };
+                    }
+                }
+                float x3 = (float) (radius * Math.sin(phi2) * Math.cos(theta1));
+                float y3 = (float) (radius * Math.cos(phi2));
+                float z3 = (float) (radius * Math.sin(phi2) * Math.sin(theta1));
+                float[] clip3 = mvp.transform(x3, y3, z3, 1.0f);
+                if (Math.abs(clip3[3]) > W_EPSILON) {
+                    float invW3 = 1.0f / clip3[3];
+                    float ndcX3 = clip3[0] * invW3;
+                    float ndcY3 = clip3[1] * invW3;
+                    float ndcZ3 = clip3[2] * invW3;
+                    if (ndcZ3 >= -1.0f && ndcZ3 <= 1.0f) {
+                        v[3] = new float[]{
+                            (ndcX3 * 0.5f + 0.5f) * (RENDER_W - 1),
+                            (1.0f - (ndcY3 * 0.5f + 0.5f)) * (RENDER_H - 1),
+                            ndcZ3
+                        };
+                    }
+                }
 
                 if (v[0] != null && v[1] != null && v[2] != null) drawTriangle(v[0], v[1], v[2], color);
                 if (v[0] != null && v[2] != null && v[3] != null) drawTriangle(v[0], v[2], v[3], color);
             }
         }
-    }
-
-    private float[] getSpherePoint(float phi, float theta, float r, Matrix4f mvp) {
-        float x = (float) (r * Math.sin(phi) * Math.cos(theta));
-        float y = (float) (r * Math.cos(phi));
-        float z = (float) (r * Math.sin(phi) * Math.sin(theta));
-        float[] clip = mvp.transform(x, y, z, 1.0f);
-        if (Math.abs(clip[3]) <= W_EPSILON) return null;
-        float invW = 1.0f / clip[3];
-        float ndcX = clip[0] * invW;
-        float ndcY = clip[1] * invW;
-        float ndcZ = clip[2] * invW;
-        if (ndcZ < -1.0f || ndcZ > 1.0f) return null;
-        return new float[]{
-            (ndcX * 0.5f + 0.5f) * (RENDER_W - 1),
-            (1.0f - (ndcY * 0.5f + 0.5f)) * (RENDER_H - 1),
-            ndcZ
-        };
     }
 
     public void drawSolidCube(EngineData data, int index, Matrix4f viewProjMatrix) {
@@ -243,7 +274,14 @@ class RasterCanvas extends JPanel {
             float[] v1 = transformed[i1];
             float[] v2 = transformed[i2];
             if (v0 != null && v1 != null && v2 != null) {
-                int faceColor = shadeFaceColor(baseColor, tri / 2);
+                float shade = 1.0f - Math.min(tri / 2, MAX_FACE_SHADE_INDEX) * FACE_SHADE_STEP;
+                int r = (baseColor >> 16) & 0xFF;
+                int g = (baseColor >> 8) & 0xFF;
+                int b = baseColor & 0xFF;
+                int rr = Math.max(0, Math.min(255, Math.round(r * shade)));
+                int gg = Math.max(0, Math.min(255, Math.round(g * shade)));
+                int bb = Math.max(0, Math.min(255, Math.round(b * shade)));
+                int faceColor = (rr << 16) | (gg << 8) | bb;
                 drawTriangle(v0, v1, v2, faceColor);
             }
         }

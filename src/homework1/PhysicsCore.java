@@ -233,33 +233,29 @@ public class PhysicsCore {
             data.avY[i] = state.angularVelocity.y;
             data.avZ[i] = state.angularVelocity.z;
 
-            eulerFromQuatXYZ(state.rotation, i);
+            float x = state.rotation.x;
+            float y = state.rotation.y;
+            float z = state.rotation.z;
+            float w = state.rotation.w;
+
+            float sinrCosp = 2.0f * (w * x + y * z);
+            float cosrCosp = 1.0f - 2.0f * (x * x + y * y);
+            data.rotX[i] = (float) Math.atan2(sinrCosp, cosrCosp);
+
+            float sinp = 2.0f * (w * y - z * x);
+            if (Math.abs(sinp) >= 1.0f) {
+                data.rotY[i] = (float) Math.copySign(Math.PI / 2.0, sinp);
+            } else {
+                data.rotY[i] = (float) Math.asin(sinp);
+            }
+
+            float sinyCosp = 2.0f * (w * z + x * y);
+            float cosyCosp = 1.0f - 2.0f * (y * y + z * z);
+            data.rotZ[i] = (float) Math.atan2(sinyCosp, cosyCosp);
+            if (Math.abs(data.rotX[i]) < EPSILON) data.rotX[i] = 0.0f;
+            if (Math.abs(data.rotY[i]) < EPSILON) data.rotY[i] = 0.0f;
+            if (Math.abs(data.rotZ[i]) < EPSILON) data.rotZ[i] = 0.0f;
         }
-    }
-
-    private void eulerFromQuatXYZ(RigidBodyPhysics.Quat q, int index) {
-        float x = q.x;
-        float y = q.y;
-        float z = q.z;
-        float w = q.w;
-
-        float sinrCosp = 2.0f * (w * x + y * z);
-        float cosrCosp = 1.0f - 2.0f * (x * x + y * y);
-        data.rotX[index] = (float) Math.atan2(sinrCosp, cosrCosp);
-
-        float sinp = 2.0f * (w * y - z * x);
-        if (Math.abs(sinp) >= 1.0f) {
-            data.rotY[index] = (float) Math.copySign(Math.PI / 2.0, sinp);
-        } else {
-            data.rotY[index] = (float) Math.asin(sinp);
-        }
-
-        float sinyCosp = 2.0f * (w * z + x * y);
-        float cosyCosp = 1.0f - 2.0f * (y * y + z * z);
-        data.rotZ[index] = (float) Math.atan2(sinyCosp, cosyCosp);
-        if (Math.abs(data.rotX[index]) < EPSILON) data.rotX[index] = 0.0f;
-        if (Math.abs(data.rotY[index]) < EPSILON) data.rotY[index] = 0.0f;
-        if (Math.abs(data.rotZ[index]) < EPSILON) data.rotZ[index] = 0.0f;
     }
 }
 
