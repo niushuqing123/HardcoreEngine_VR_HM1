@@ -16,6 +16,9 @@ public class EngineData {
     public float[] yPos = new float[MAX_ENTITIES];
     public float[] zPos = new float[MAX_ENTITIES];
     public float[] size = new float[MAX_ENTITIES];
+    public float[] sizeX = new float[MAX_ENTITIES];
+    public float[] sizeY = new float[MAX_ENTITIES];
+    public float[] sizeZ = new float[MAX_ENTITIES];
     public int[] colors = new int[MAX_ENTITIES];
     
     // 物理引擎所需的速度数组 (扁平化)
@@ -32,19 +35,64 @@ public class EngineData {
     public float[] avX = new float[MAX_ENTITIES];
     public float[] avY = new float[MAX_ENTITIES];
     public float[] avZ = new float[MAX_ENTITIES];
-    
+    public boolean[] isStatic = new boolean[MAX_ENTITIES];
+    public boolean[] isSphere = new boolean[MAX_ENTITIES];
+    public boolean[] isKinematic = new boolean[MAX_ENTITIES];
+
     // 提供一个快速添加方块的方法
     public void addCube(float x, float y, float z, float s, int hexColor) {
-        addCube(x, y, z, s, hexColor, true);
+        addBox(x, y, z, s, s, s, hexColor, true, false);
+    }
+    
+    // 向前兼容无isStatic参数
+    public void addCube(float x, float y, float z, float s, int hexColor, boolean withInitialPerturbation) {
+        addBox(x, y, z, s, s, s, hexColor, withInitialPerturbation, false);
     }
 
-    public void addCube(float x, float y, float z, float s, int hexColor, boolean withInitialPerturbation) {
+    public void addCube(float x, float y, float z, float s, int hexColor, boolean withInitialPerturbation, boolean isStaticBlock) {
+        addBox(x, y, z, s, s, s, hexColor, withInitialPerturbation, isStaticBlock);
+    }
+
+    public void addBox(float x, float y, float z,
+                       float sx, float sy, float sz,
+                       int hexColor, boolean withInitialPerturbation, boolean isStaticBlock) {
+        addGenericShape(x, y, z, sx, sy, sz, hexColor, withInitialPerturbation, isStaticBlock, false, false, false);
+    }
+
+    public int addKinematicBox(float x, float y, float z,
+                               float sx, float sy, float sz,
+                               int hexColor) {
+        addGenericShape(x, y, z, sx, sy, sz, hexColor, false, false, true, false, false);
+        return count - 1;
+    }
+
+    public void addSphere(float x, float y, float z, float radius, int hexColor, boolean isStaticBlock) {
+        addGenericShape(x, y, z, radius * 2, radius * 2, radius * 2, hexColor, false, isStaticBlock, false, true, false);
+    }
+
+    public int addRotatorBox(float x, float y, float z,
+                             float sx, float sy, float sz, int hexColor) {
+        addGenericShape(x, y, z, sx, sy, sz, hexColor, false, false, true, false, false);
+        return count - 1;
+    }
+
+    private void addGenericShape(float x, float y, float z,
+                                float sx, float sy, float sz,
+                                int hexColor, boolean withInitialPerturbation,
+                                boolean isStaticBlock, boolean isKinematicBlock,
+                                boolean sphereMode, boolean unused) {
         if (count >= MAX_ENTITIES) return; // 防止越界
         xPos[count] = x;
         yPos[count] = y;
         zPos[count] = z;
-        size[count] = s;
+        size[count] = Math.max(sx, Math.max(sy, sz));
+        sizeX[count] = sx;
+        sizeY[count] = sy;
+        sizeZ[count] = sz;
         colors[count] = hexColor;
+        isStatic[count] = isStaticBlock;
+        isSphere[count] = sphereMode;
+        isKinematic[count] = isKinematicBlock;
 
         if (withInitialPerturbation) {
             // 初始微扰：避免所有方块完美对齐

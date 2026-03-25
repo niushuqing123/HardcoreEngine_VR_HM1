@@ -423,6 +423,7 @@ public class RigidBodyPhysics {
         // 累积本帧想要施加的力；step() 结束时 clearAccumulators() 会将其清零。
         integrateForces(dt);
         integrateVelocities(dt);
+        autoComputeKinematicVelocities(dt);
         updateAllDerivedBodyState();
         buildBroadphasePairs();
         generateContacts(dt);
@@ -997,6 +998,24 @@ public class RigidBodyPhysics {
                 float[] newRot = integrateRotationEuler(rotation.get(h), av, dt);
                 System.arraycopy(newRot, 0, rotation.get(h), 0, 4);
             }
+        }
+    }
+
+    /**
+     * 自动推算 Kinematic 刚体的线速度（从帧间位移推算）。
+     * 角速度需由外部通过 setBodyVelocity() 显式设置，因为从四元数差分推算精度不稳定。
+     */
+    private void autoComputeKinematicVelocities(float dt) {
+        if (dt <= EPS) return;
+        float invDt = 1.0f / dt;
+        for (int h : activeHandles) {
+            if (motionType.get(h) != MotionType.KINEMATIC) continue;
+            float[] pos     = position.get(h);
+            float[] prevPos = prevPosition.get(h);
+            float[] lv      = linearVelocity.get(h);
+            lv[0] = (pos[0] - prevPos[0]) * invDt;
+            lv[1] = (pos[1] - prevPos[1]) * invDt;
+            lv[2] = (pos[2] - prevPos[2]) * invDt;
         }
     }
 

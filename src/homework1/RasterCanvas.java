@@ -10,11 +10,13 @@ import javax.swing.JPanel;
 
 @SuppressWarnings("serial")
 public class RasterCanvas extends JPanel {
-    public static final int RENDER_W = 320;
-    public static final int RENDER_H = 240;
-    private static final float CAMERA_Y = -200.0f;
-    private static final float CAMERA_Z = -800.0f;
-    private static final float CAMERA_FOV = (float) Math.toRadians(60.0);
+    // 渲染分辨率改为正方形
+    public static final int RENDER_W = 640;
+    public static final int RENDER_H = 640;
+    // 调相机看这里：Y 更负表示相机更高，Z 越接近 0 表示相机越往前。
+    public static final float CAMERA_Y = -210.0f;
+    public static final float CAMERA_Z = -740.0f;
+    public static final float CAMERA_FOV = (float) Math.toRadians(60.0);
     private static final float CAMERA_NEAR = 0.1f;
     private static final float CAMERA_FAR = 5000.0f;
     private static final float W_EPSILON = 1.0e-6f;
@@ -104,10 +106,10 @@ public class RasterCanvas extends JPanel {
     }
 
     private void drawTriangle(float[] v0, float[] v1, float[] v2, int color) {
-        int minX = Math.max(0, (int) Math.floor(Math.min(v0[0], Math.min(v1[0], v2[0]))));
-        int maxX = Math.min(RENDER_W - 1, (int) Math.ceil(Math.max(v0[0], Math.max(v1[0], v2[0]))));
-        int minY = Math.max(0, (int) Math.floor(Math.min(v0[1], Math.min(v1[1], v2[1]))));
-        int maxY = Math.min(RENDER_H - 1, (int) Math.ceil(Math.max(v0[1], Math.max(v1[1], v2[1]))));
+        int minX = Math.max(0, (int) Math.floor(Math.min(v0[0], Math.min(v1[0], v2[0]))) - 1);
+        int maxX = Math.min(RENDER_W - 1, (int) Math.ceil(Math.max(v0[0], Math.max(v1[0], v2[0]))) + 1);
+        int minY = Math.max(0, (int) Math.floor(Math.min(v0[1], Math.min(v1[1], v2[1]))) - 1);
+        int maxY = Math.min(RENDER_H - 1, (int) Math.ceil(Math.max(v0[1], Math.max(v1[1], v2[1]))) + 1);
         if (minX > maxX || minY > maxY) {
             return;
         }
@@ -146,8 +148,59 @@ public class RasterCanvas extends JPanel {
         }
     }
 
+    private void drawSphereInternal(EngineData data, int index, Matrix4f viewProjMatrix) {
+        float radius = data.sizeX[index] * 0.5f;
+        Matrix4f model = Matrix4f.createTranslation(data.xPos[index], data.yPos[index], data.zPos[index]);
+        Matrix4f mvp = Matrix4f.multiply(viewProjMatrix, model);
+        int color = data.colors[index];
+        int rings = 8;
+        int sectors = 8;
+        
+        for (int r = 0; r < rings; r++) {
+            float phi1 = (float) (Math.PI * r / rings);
+            float phi2 = (float) (Math.PI * (r + 1) / rings);
+            for (int s = 0; s < sectors; s++) {
+                float theta1 = (float) (2.0 * Math.PI * s / sectors);
+                float theta2 = (float) (2.0 * Math.PI * (s + 1) / sectors);
+                
+                float[][] v = new float[4][3];
+                v[0] = getSpherePoint(phi1, theta1, radius, mvp);
+                v[1] = getSpherePoint(phi1, theta2, radius, mvp);
+                v[2] = getSpherePoint(phi2, theta2, radius, mvp);
+                v[3] = getSpherePoint(phi2, theta1, radius, mvp);
+
+                if (v[0] != null && v[1] != null && v[2] != null) drawTriangle(v[0], v[1], v[2], color);
+                if (v[0] != null && v[2] != null && v[3] != null) drawTriangle(v[0], v[2], v[3], color);
+            }
+        }
+    }
+
+    private float[] getSpherePoint(float phi, float theta, float r, Matrix4f mvp) {
+        float x = (float) (r * Math.sin(phi) * Math.cos(theta));
+        float y = (float) (r * Math.cos(phi));
+        float z = (float) (r * Math.sin(phi) * Math.sin(theta));
+        float[] clip = mvp.transform(x, y, z, 1.0f);
+        if (Math.abs(clip[3]) <= W_EPSILON) return null;
+        float invW = 1.0f / clip[3];
+        float ndcX = clip[0] * invW;
+        float ndcY = clip[1] * invW;
+        float ndcZ = clip[2] * invW;
+        if (ndcZ < -1.0f || ndcZ > 1.0f) return null;
+        return new float[]{
+            (ndcX * 0.5f + 0.5f) * (RENDER_W - 1),
+            (1.0f - (ndcY * 0.5f + 0.5f)) * (RENDER_H - 1),
+            ndcZ
+        };
+    }
+
     public void drawSolidCube(EngineData data, int index, Matrix4f viewProjMatrix) {
-        float cubeSize = data.size[index];
+        if (data.isSphere[index]) {
+            drawSphereInternal(data, index, viewProjMatrix);
+            return;
+        }
+        float boxSizeX = data.sizeX[index];
+        float boxSizeY = data.sizeY[index];
+        float boxSizeZ = data.sizeZ[index];
         Matrix4f model = Matrix4f.multiply(
                 Matrix4f.createTranslation(data.xPos[index], data.yPos[index], data.zPos[index]),
                 Matrix4f.multiply(
@@ -159,9 +212,9 @@ public class RasterCanvas extends JPanel {
 
         float[][] transformed = new float[CUBE_VERTICES.length][];
         for (int v = 0; v < 8; v++) {
-            float lx = CUBE_VERTICES[v][0] * cubeSize;
-            float ly = CUBE_VERTICES[v][1] * cubeSize;
-            float lz = CUBE_VERTICES[v][2] * cubeSize;
+            float lx = CUBE_VERTICES[v][0] * boxSizeX;
+            float ly = CUBE_VERTICES[v][1] * boxSizeY;
+            float lz = CUBE_VERTICES[v][2] * boxSizeZ;
             float[] clip = mvp.transform(lx, ly, lz, 1.0f);
             float w = clip[3];
             if (Math.abs(w) <= W_EPSILON) {
@@ -202,7 +255,7 @@ public class RasterCanvas extends JPanel {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g2d.drawImage(image, 0, 0, getWidth(), getHeight(), null);
     }
 }

@@ -11,10 +11,10 @@ public class PhysicsCore {
     private static final float MIN_HALF_EXTENT = 0.001f;
     private static final float GROUND_HALF_HEIGHT = 25.0f;
     private static final float GROUND_HALF_EXTENT = 5000.0f;
-    private static final float EXPLOSION_RADIUS = 450.0f;
+    private static final float EXPLOSION_RADIUS = 1200.0f;
     private static final float EXPLOSION_RADIUS_SQ = EXPLOSION_RADIUS * EXPLOSION_RADIUS;
     private static final float MIN_EXPLOSION_DIST = 0.001f;
-    private static final float EXPLOSION_DISTANCE_OFFSET = 80.0f;
+    private static final float EXPLOSION_DISTANCE_OFFSET = 50.0f;
     private static final float EPSILON = 1e-6f;
 
     public PhysicsCore(EngineData data) {
@@ -53,6 +53,9 @@ public class PhysicsCore {
 
         syncBodiesToPhysics();
         for (int i = 0; i < mappedCount; i++) {
+            if (data.isStatic[i] || data.isKinematic[i]) {
+                continue;
+            }
             int handle = bodyHandles[i];
             RigidBodyPhysics.BodyState state = rigidBodyPhysics.getBodyState(handle);
             if (state == null) {
@@ -100,6 +103,57 @@ public class PhysicsCore {
         writeBackBodyStates();
     }
 
+    /** 外部调用：每帧驱动 kinematic 刚体到新的 Y 轴旋转角度（直接改写物理变换） */
+    public void driveKinematicBody(int entityIdx, float yAngle, float angularSpeed) {
+        if (entityIdx < 0 || entityIdx >= mappedCount) return;
+        if (!data.isKinematic[entityIdx]) return;
+        int handle = bodyHandles[entityIdx];
+        if (handle < 0) return;
+        float halfAngle = yAngle * 0.5f;
+        float sy = (float) Math.sin(halfAngle);
+        float cy = (float) Math.cos(halfAngle);
+        RigidBodyPhysics.Vec3 pos = new RigidBodyPhysics.Vec3(
+                data.xPos[entityIdx], data.yPos[entityIdx], data.zPos[entityIdx]);
+        RigidBodyPhysics.Quat rot = new RigidBodyPhysics.Quat(0.0f, sy, 0.0f, cy);
+        rigidBodyPhysics.setBodyTransform(handle, pos, rot);
+        // 关键修复：设置角速度，使碰撞求解器能正确计算接触点相对速度
+        RigidBodyPhysics.Vec3 linVel = new RigidBodyPhysics.Vec3(0.0f, 0.0f, 0.0f);
+        RigidBodyPhysics.Vec3 angVel = new RigidBodyPhysics.Vec3(0.0f, angularSpeed, 0.0f);
+        rigidBodyPhysics.setBodyVelocity(handle, linVel, angVel);
+    }
+
+    /** 驱动绕 Z 轴旋转且沿轨道移动的 kinematic 刚体。 */
+    public void driveKinematicBodyZ(int entityIdx,
+                                    float x, float y, float z,
+                                    float zAngle,
+                                    float linearVx, float linearVy, float linearVz,
+                                    float angularSpeedZ) {
+        if (entityIdx < 0 || entityIdx >= mappedCount) return;
+        if (!data.isKinematic[entityIdx]) return;
+        int handle = bodyHandles[entityIdx];
+        if (handle < 0) return;
+        float halfAngle = zAngle * 0.5f;
+        float sz = (float) Math.sin(halfAngle);
+        float cz = (float) Math.cos(halfAngle);
+        RigidBodyPhysics.Vec3 pos = new RigidBodyPhysics.Vec3(x, y, z);
+        RigidBodyPhysics.Quat rot = new RigidBodyPhysics.Quat(0.0f, 0.0f, sz, cz);
+        rigidBodyPhysics.setBodyTransform(handle, pos, rot);
+        RigidBodyPhysics.Vec3 linVel = new RigidBodyPhysics.Vec3(linearVx, linearVy, linearVz);
+        RigidBodyPhysics.Vec3 angVel = new RigidBodyPhysics.Vec3(0.0f, 0.0f, angularSpeedZ);
+        rigidBodyPhysics.setBodyVelocity(handle, linVel, angVel);
+    }
+
+    public void addStaticBoxBody(float centerX, float centerY, float centerZ,
+                                 float halfExtentX, float halfExtentY, float halfExtentZ) {
+        RigidBodyPhysics.BodyDesc desc = new RigidBodyPhysics.BodyDesc();
+        desc.motionType = RigidBodyPhysics.MotionType.STATIC;
+        desc.shapeType = RigidBodyPhysics.ShapeType.BOX;
+        desc.boxHalfExtents = new RigidBodyPhysics.Vec3(halfExtentX, halfExtentY, halfExtentZ);
+        desc.position = new RigidBodyPhysics.Vec3(centerX, centerY, centerZ);
+        desc.friction = 0.8f;
+        rigidBodyPhysics.addBody(desc);
+    }
+
     private void addStaticGroundBody() {
         RigidBodyPhysics.BodyDesc ground = new RigidBodyPhysics.BodyDesc();
         ground.motionType = RigidBodyPhysics.MotionType.STATIC;
@@ -113,16 +167,31 @@ public class PhysicsCore {
     private void syncBodiesToPhysics() {
         while (mappedCount < data.count) {
             int i = mappedCount;
-            float half = Math.max(data.size[i] * 0.5f, MIN_HALF_EXTENT);
+            float halfX = Math.max(data.sizeX[i] * 0.5f, MIN_HALF_EXTENT);
+            float halfY = Math.max(data.sizeY[i] * 0.5f, MIN_HALF_EXTENT);
+            float halfZ = Math.max(data.sizeZ[i] * 0.5f, MIN_HALF_EXTENT);
 
             RigidBodyPhysics.BodyDesc desc = new RigidBodyPhysics.BodyDesc();
-            desc.motionType = RigidBodyPhysics.MotionType.DYNAMIC;
-            desc.shapeType = RigidBodyPhysics.ShapeType.BOX;
-            desc.boxHalfExtents = new RigidBodyPhysics.Vec3(half, half, half);
+            RigidBodyPhysics.MotionType mtype;
+            if (data.isStatic[i]) {
+                mtype = RigidBodyPhysics.MotionType.STATIC;
+            } else if (data.isKinematic[i]) {
+                mtype = RigidBodyPhysics.MotionType.KINEMATIC;
+            } else {
+                mtype = RigidBodyPhysics.MotionType.DYNAMIC;
+            }
+            desc.motionType = mtype;
+            if (data.isSphere[i]) {
+                desc.shapeType = RigidBodyPhysics.ShapeType.SPHERE;
+                desc.sphereRadius = data.size[i] * 0.5f;
+            } else {
+                desc.shapeType = RigidBodyPhysics.ShapeType.BOX;
+                desc.boxHalfExtents = new RigidBodyPhysics.Vec3(halfX, halfY, halfZ);
+            }
             desc.position = new RigidBodyPhysics.Vec3(
-                    data.xPos[i] + half,
-                    data.yPos[i] + half,
-                    data.zPos[i] + half
+                data.xPos[i],
+                data.yPos[i],
+                data.zPos[i]
             );
             desc.linearVelocity = new RigidBodyPhysics.Vec3(data.vx[i], data.vy[i], data.vz[i]);
             desc.angularVelocity = new RigidBodyPhysics.Vec3(data.avX[i], data.avY[i], data.avZ[i]);
@@ -137,15 +206,18 @@ public class PhysicsCore {
 
     private void writeBackBodyStates() {
         for (int i = 0; i < mappedCount; i++) {
+            // Kinematic bodies are driven externally; skip write-back to avoid overwriting
+            if (data.isKinematic[i]) {
+                continue;
+            }
             RigidBodyPhysics.BodyState state = rigidBodyPhysics.getBodyState(bodyHandles[i]);
             if (state == null) {
                 continue;
             }
 
-            float half = data.size[i] * 0.5f;
-            data.xPos[i] = state.position.x - half;
-            data.yPos[i] = state.position.y - half;
-            data.zPos[i] = state.position.z - half;
+            data.xPos[i] = state.position.x;
+            data.yPos[i] = state.position.y;
+            data.zPos[i] = state.position.z;
             data.vx[i] = state.linearVelocity.x;
             data.vy[i] = state.linearVelocity.y;
             data.vz[i] = state.linearVelocity.z;
