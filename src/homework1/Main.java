@@ -1,5 +1,7 @@
 package homework1;
 
+// 程序入口与主循环。
+
 import java.awt.event.MouseAdapter;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
@@ -33,8 +35,8 @@ public class Main {
     private static final float ROOM_SIDE_THICKNESS = 32.0f;
     private static final float ROOM_BACK_THICKNESS = 32.0f;
     private static final float ROOM_FLOOR_THICKNESS = 32.0f;
-    private static final float FAN_SPIN_SPEED   = 1.8f;  // rad/s, ceiling fan
-    private static final float BLADE_SPIN_SPEED = 3.0f;  // rad/s, blender blade (减速)
+    private static final float FAN_SPIN_SPEED   = 1.8f;
+    private static final float BLADE_SPIN_SPEED = 3.0f;
     private static final float[][] UNIT_CUBE_VERTICES = {
             {-0.5f, -0.5f, -0.5f},
             {0.5f, -0.5f, -0.5f},
@@ -54,35 +56,35 @@ public class Main {
         float wallImpactZ;
         int fanIndex   = -1;
         int bladeIndex = -1;
-        // 单开口盒子（不含前侧可破碎墙）的 5 面房间墙体索引
+
         int[] roomPanelIndices = new int[5];
         int roomPanelCount = 0;
-        // 滚筒旋转的轴心（房间中心 XY）
+
         float drumPivotX = 0.0f;
         float drumPivotY = 0.0f;
     }
-    
+
     public static void main(String[] args) {
-        // 1. 初始化数据引擎 (Model 层)
+
         SceneSetup setup = createInitialScene();
-        
-        // 3. 将数据层丢给渲染画布 (View 层)
+
+
         RasterCanvas canvas = new RasterCanvas();
-        
-        // 4. 装载并显示窗口
+
+
         JFrame frame = new JFrame("Hardcore Engine v0.3 - AI Agent Ready");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.add(canvas);
-        // 窗口改为正方形以匹配渲染比例
+
         frame.setSize(900, 900);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
 
-        // 5. 启动核心引擎与交互！
+
         engineStart(canvas, setup);
     }
 
-    // 核心调度器：包含物理主循环和输入监听
+
     public static void engineStart(RasterCanvas canvas, SceneSetup setup) {
         final class LoopState {
             long lastTickNanos;
@@ -105,19 +107,19 @@ public class Main {
             int bladeIndex = -1;
             float fanAngle   = 0.0f;
             float bladeAngle = 0.0f;
-            // 滚筒洗衣机动画状态（点击红块后开始）
+
             int[] roomPanelIndices = new int[0];
             float drumPivotX = 0.0f;
             float drumPivotY = 0.0f;
-            float drumAngle     = 0.0f;  // 当前最新旋转总量（rad）
-            float drumAngleBase = 0.0f;  // 本次滚动开始时的角度
-            float drumPhaseTimer = 0.0f; // 本阶段已过时间（s）
-            float drumStartDelay = 0.0f; // 点击后延迟开始滚动（s）
-            boolean drumRolling  = false; // true=正在滚动，false=正在等待
+            float drumAngle     = 0.0f;
+            float drumAngleBase = 0.0f;
+            float drumPhaseTimer = 0.0f;
+            float drumStartDelay = 0.0f;
+            boolean drumRolling  = false;
         }
         final LoopState loopState = new LoopState();
-        
-        // 初始化物理核心 (你刚才新建的包含 TODO 的占位类)
+
+
         loopState.engineData = setup.data;
         loopState.physicsCore = null;
         loopState.enterButtonIndex = setup.enterButtonIndex;
@@ -157,7 +159,7 @@ public class Main {
             canvas.repaint();
         };
 
-        // 1. 游戏主循环 (Game Loop) - 锁定约 60 FPS (16ms)
+
         Timer gameLoop = new Timer(16, e -> {
             long now = System.nanoTime();
             float frameDt = (now - loopState.lastTickNanos) * 1.0e-9f;
@@ -174,19 +176,19 @@ public class Main {
 
             int substeps = 0;
             while (loopState.physicsActive && loopState.accumulator >= FIXED_DT && substeps < MAX_SUBSTEPS_PER_FRAME) {
-                // Advance kinematic angles before each physics step
+
                 loopState.fanAngle   += FAN_SPIN_SPEED   * FIXED_DT;
                 loopState.bladeAngle += BLADE_SPIN_SPEED * FIXED_DT;
                 if (loopState.fanIndex   >= 0) loopState.physicsCore.driveKinematicBody(loopState.fanIndex,   loopState.fanAngle, FAN_SPIN_SPEED);
                 if (loopState.bladeIndex >= 0) loopState.physicsCore.driveKinematicBody(loopState.bladeIndex, loopState.bladeAngle, BLADE_SPIN_SPEED);
                 if (loopState.roomPanelIndices.length > 0) {
-                    // 如果存在点击后的初始延迟，先消耗它
+
                     if (loopState.drumStartDelay > 0.0f) {
                         loopState.drumStartDelay = Math.max(0.0f, loopState.drumStartDelay - FIXED_DT);
                     } else {
                         loopState.drumPhaseTimer += FIXED_DT;
                         final float drumRollDuration = 1.0f;
-                        final float drumWaitDuration = 2.0f; // 改为 2 秒间隔
+                        final float drumWaitDuration = 2.0f;
                         final float drumStep = (float) (Math.PI * 0.5);
                         if (loopState.drumRolling) {
                             float t = Math.min(loopState.drumPhaseTimer / drumRollDuration, 1.0f);
@@ -220,12 +222,12 @@ public class Main {
                 loopState.accumulator -= FIXED_DT;
                 substeps++;
             }
-            // Also rotate visually when physics is not yet active (before explosion)
+
             if (!loopState.physicsActive) {
                 loopState.fanAngle   += FAN_SPIN_SPEED   * frameDt;
                 loopState.bladeAngle += BLADE_SPIN_SPEED * frameDt;
             }
-            // Update visual rotation in EngineData so the renderer picks it up
+
             if (loopState.fanIndex   >= 0) loopState.engineData.rotY[loopState.fanIndex]   = loopState.fanAngle;
             if (loopState.bladeIndex >= 0) loopState.engineData.rotY[loopState.bladeIndex] = loopState.bladeAngle;
 
@@ -249,10 +251,10 @@ public class Main {
                 loopState.lastStatsPrintNanos = now;
             }
 
-            // 绿色方块每秒随机换一个
+
                 if (loopState.physicsActive && loopState.returnButtonIndex >= 0
                     && (now - loopState.lastReturnButtonSwapNanos) >= 2_000_000_000L) {
-                // 恢复旧率色
+
                 loopState.engineData.colors[loopState.returnButtonIndex] = loopState.returnButtonOriginalColor;
                 int newReturnIdx = -1;
                 if (loopState.engineData.count > 1) {
@@ -280,7 +282,7 @@ public class Main {
             for (int i = 0; i < loopState.engineData.count; i++) {
                 canvas.drawSolidCube(loopState.engineData, i, viewProjMatrix);
             }
-            canvas.repaint(); // 触发 RasterCanvas 重新画图
+            canvas.repaint();
         });
         loopState.lastTickNanos = System.nanoTime();
         loopState.lastStatsPrintNanos = loopState.lastTickNanos;
@@ -296,8 +298,8 @@ public class Main {
                 }
             }
         });
- 
-        // 2. 交互监听器占位 - 给云端 AI 留的外包作业
+
+
         canvas.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -320,14 +322,14 @@ public class Main {
                             }
                         }
                         if (newIdx >= 0) {
-                            // 保存旧颜色再涂绿
+
                             loopState.returnButtonOriginalColor = loopState.engineData.colors[newIdx];
                             loopState.returnButtonIndex = newIdx;
                             loopState.engineData.colors[newIdx] = RETURN_BUTTON_COLOR;
                             loopState.lastReturnButtonSwapNanos = System.nanoTime();
                         }
                         loopState.physicsCore = new PhysicsCore(loopState.engineData);
-                        // 精确贴合开口，使空气墙像一块玻璃板封住前侧方块墙
+
                         loopState.physicsCore.addStaticBoxBody(
                             loopState.wallCenterX,
                             loopState.wallCenterY,
@@ -336,7 +338,7 @@ public class Main {
                             WALL_ROWS * CUBE_SIZE * 0.5f,
                             AIR_WALL_THICKNESS * 0.5f);
                         loopState.physicsActive = true;
-                        // 点击后延迟 2 秒再开始滚动
+
                         loopState.drumStartDelay = 2.0f;
                         loopState.drumRolling = false;
                         loopState.drumPhaseTimer = 0.0f;
@@ -379,7 +381,7 @@ public class Main {
         float wallOriginX = -wallSpanX * 0.5f;
         float wallOuterWidth = WALL_COLUMNS * CUBE_SIZE;
         float wallOuterHeight = WALL_ROWS * CUBE_SIZE;
-        // 内部空间保持严格正方形（以较小边为准，保证方块墙能尽可能完整）
+
         float roomInnerSize = Math.min(wallOuterWidth, wallOuterHeight);
         float roomInnerWidth = roomInnerSize;
         float roomInnerHeight = roomInnerSize;
@@ -406,18 +408,18 @@ public class Main {
 
         float roomCenterZ = WALL_FRONT_Z - roomInnerDepth * 0.5f;
         float fanBarW    = wallOuterWidth * 0.75f;
-        float fanBarH    = CUBE_SIZE * 0.18f * 2.0f; // 加宽/加高为原来的2倍
+        float fanBarH    = CUBE_SIZE * 0.18f * 2.0f;
         float fanBarD    = CUBE_SIZE * 0.35f * 2.0f;
-        float fanY       = (WALL_BASE_Y + wallOuterHeight) - CUBE_SIZE * 0.6f; // near ceiling
+        float fanY       = (WALL_BASE_Y + wallOuterHeight) - CUBE_SIZE * 0.6f;
         setup.fanIndex   = data.addRotatorBox(0.0f, fanY, roomCenterZ,
                                               fanBarW, fanBarH, fanBarD, 0x4A90D9);
 
         float bladeBarW  = wallOuterWidth * 0.65f;
-        // 将宽和高设为相同且放大一点，避免过细；这里用基于方块尺寸的统一厚度
-        float bladeThickness = CUBE_SIZE * 0.6f; // 同时作为 H 和 D
+
+        float bladeThickness = CUBE_SIZE * 0.6f;
         float bladeBarH  = bladeThickness;
         float bladeBarD  = bladeThickness;
-        // 将刀片中心贴着场景底部（底面与地面齐） —— 地面顶面 Y = 0，因此中心 Y = half thickness
+
         float bladeY     = bladeBarH * 0.5f;
         setup.bladeIndex = data.addRotatorBox(0.0f, bladeY, roomCenterZ,
                               bladeBarW, bladeBarH, bladeBarD, 0xE87722);
@@ -474,7 +476,7 @@ public class Main {
                 ROOM_FLOOR_THICKNESS,
                 roomInnerDepth + ROOM_BACK_THICKNESS,
             ROOM_WALL_COLOR);
-        // 滚筒旋转轴心 = 房间内部 XY 中心
+
         setup.drumPivotX = 0.0f;
         setup.drumPivotY = sideWallCenterY;
 
@@ -525,7 +527,7 @@ public class Main {
                                 Matrix4f.createRotationX(data.rotX[cubeIndex]))));
         Matrix4f mvp = Matrix4f.multiply(canvas.getViewProjMatrix(), model);
 
-        // 优先使用投影中心点 + 自适应半径命中检测（对翻滚中的方块准确均适用）
+
         float[] centerClip = mvp.transform(0.0f, 0.0f, 0.0f, 1.0f);
         float cw = centerClip[3];
         if (cw > 1.0e-6f) {
@@ -537,7 +539,7 @@ public class Main {
                 float cScreenY = (1.0f - (cNdcY * 0.5f + 0.5f)) * canvas.getHeight();
                 float dx = mouseX - cScreenX;
                 float dy = mouseY - cScreenY;
-                // 屏幕半径：基于方块最大尺寸和透视深度自动估算
+
                 float maxSize = Math.max(sizeX, Math.max(sizeY, sizeZ));
                 float projRadius = maxSize * canvas.getWidth() / (2.0f * cw);
                 float clickRadius = Math.max(projRadius * 0.65f, BUTTON_HIT_PADDING + 20.0f);
@@ -547,7 +549,7 @@ public class Main {
             }
         }
 
-        // 备用：8 顶点屏幕 AABB（处理中心点在相机后方的极端情况）
+
         float minX = Float.POSITIVE_INFINITY;
         float maxX = Float.NEGATIVE_INFINITY;
         float minY = Float.POSITIVE_INFINITY;
