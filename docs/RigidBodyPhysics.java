@@ -237,8 +237,6 @@ public class RigidBodyPhysics {
     private static final class CachedContactPoint {
         float[] point       = new float[3];
         float   normalLambda;
-        float   t1Lambda;
-        float   t2Lambda;
     }
 
     private static final class CachedManifold {
@@ -1639,8 +1637,6 @@ public class RigidBodyPhysics {
                 ContactData c = contacts.get(manifold.firstContact + i);
                 cached.points[i].point       = c.point.clone();
                 cached.points[i].normalLambda = c.normalLambda;
-                cached.points[i].t1Lambda     = c.t1Lambda;
-                cached.points[i].t2Lambda     = c.t2Lambda;
             }
             nextCache.put(makePairKey(manifold.a, manifold.b), cached);
         }
