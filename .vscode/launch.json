@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Debug Main (Java 1.8)",
+            "request": "launch",
+            "mainClass": "homework1.Main",
+            "cwd": "${workspaceFolder}",
+            "projectName": "虚拟现实作业_物理引擎",
+            "preLaunchTask": "Compile Java 1.8",
+            "console": "integratedTerminal"
+        }
+    ]
+}

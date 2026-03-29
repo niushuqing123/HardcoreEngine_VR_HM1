@@ -1,6 +1,5 @@
 package homework1;
 
-// 光栅渲染核心实现。
 
 import java.awt.Graphics;
 import java.awt.Graphics2D;

@@ -64,7 +64,9 @@ public class Main {
         float drumPivotY = 0.0f;
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) {    
+        System.out.println("当前实际运行的Java版本是: " + System.getProperty("java.version"));
+
 
         SceneSetup setup = createInitialScene();
 
@@ -302,7 +304,7 @@ public class Main {
 
         canvas.addMouseListener(new MouseAdapter() {
             @Override
-            public void mouseClicked(MouseEvent e) {
+            public void mousePressed(MouseEvent e) {
                 int mouseX = e.getX();
                 int mouseY = e.getY();
 
@@ -367,6 +369,20 @@ public class Main {
                             viewY - RasterCanvas.CAMERA_Y,
                             loopState.wallImpactZ,
                             EXPLOSION_FORCE * 0.5f);
+
+                    float spawnZ = WALL_FRONT_Z - CUBE_SIZE * 0.5f;
+                    float spawnViewDepth = spawnZ + RasterCanvas.CAMERA_Z;
+                    float spawnX = ndcX * (-spawnViewDepth) * aspect / focalLength;
+                    float spawnY = ndcY * (-spawnViewDepth) / focalLength - RasterCanvas.CAMERA_Y;
+                    int throwColor = 0xE87722;
+                    int thrownIdx = loopState.engineData.count;
+                    loopState.engineData.addCube(spawnX, spawnY, spawnZ, CUBE_SIZE, throwColor, false, false);
+                    loopState.engineData.vz[thrownIdx] = -500.0f - loopState.random.nextFloat() * 300.0f;
+                    loopState.engineData.vx[thrownIdx] = (loopState.random.nextFloat() - 0.5f) * 80.0f;
+                    loopState.engineData.vy[thrownIdx] = (loopState.random.nextFloat() - 0.5f) * 80.0f;
+                    loopState.engineData.avX[thrownIdx] = (loopState.random.nextFloat() - 0.5f) * 5.0f;
+                    loopState.engineData.avY[thrownIdx] = (loopState.random.nextFloat() - 0.5f) * 5.0f;
+                    loopState.engineData.avZ[thrownIdx] = (loopState.random.nextFloat() - 0.5f) * 5.0f;
                 }
                 canvas.requestFocusInWindow();
             }
@@ -386,8 +402,9 @@ public class Main {
         float roomInnerWidth = roomInnerSize;
         float roomInnerHeight = roomInnerSize;
         float roomInnerDepth = ROOM_DEPTH_CUBES * CUBE_SIZE;
-        int enterColumn = WALL_COLUMNS / 2;
-        int enterRow = WALL_ROWS / 2;
+        Random sceneRandom = new Random();
+        int enterColumn = 2 + sceneRandom.nextInt(WALL_COLUMNS - 4);
+        int enterRow = 2 + sceneRandom.nextInt(WALL_ROWS - 4);
 
         for (int row = 0; row < WALL_ROWS; row++) {
             for (int column = 0; column < WALL_COLUMNS; column++) {

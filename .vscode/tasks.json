@@ -1,0 +1,29 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Compile Java 1.8",
+            "type": "shell",
+            "command": "& 'C:/Program Files/Eclipse Adoptium/jdk-8.0.482.8-hotspot/bin/javac.exe' -source 1.8 -target 1.8 -encoding UTF-8 -d bin src/homework1/*.java",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$javac"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run Main (Java 1.8)",
+            "type": "shell",
+            "command": "& 'C:/Program Files/Eclipse Adoptium/jdk-8.0.482.8-hotspot/bin/java.exe' -cp bin homework1.Main",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "Compile Java 1.8"
+        }
+    ]
+}
